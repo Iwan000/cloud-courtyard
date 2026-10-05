@@ -111,6 +111,7 @@ func _show_scenery(lvl: LevelData, offset: Vector2) -> void:
 
 func go_title() -> void:
 	_clear_screen()
+	_close_editor()
 	controller.stop()
 	screen = Screen.TITLE
 	if Game.builtin.is_empty():
@@ -135,6 +136,8 @@ func go_title() -> void:
 
 func go_select(select_id := "") -> void:
 	_clear_screen()
+	if not testing_from_editor:
+		_close_editor()
 	controller.stop()
 	director.reset_camera(0.01)
 	screen = Screen.SELECT
@@ -224,6 +227,9 @@ func play_level(lvl: LevelData, from_editor := false) -> void:
 	hud.show_objective("将 %d 只石箱推到发光的印记上" % lvl.boxes.size())
 	controller.begin(state, board, world)
 	_transitioning = false
+	if lvl.has_meta("autoplay") and lvl.solution != "":
+		hud.show_objective("演示最优解：%d 步" % lvl.solution.length(), 2.5)
+		controller.play_lurd(lvl.solution)
 
 
 func _restart() -> void:
@@ -348,6 +354,7 @@ func _open_settings() -> void:
 # 编辑器
 # ---------------------------------------------------------------------------
 
+## 进入编辑器。从试玩返回时恢复原编辑器（撤销历史等状态完整保留）。
 func go_editor(lvl: LevelData) -> void:
 	_clear_screen()
 	controller.stop()
@@ -355,11 +362,27 @@ func go_editor(lvl: LevelData) -> void:
 	director.reset_camera(0.01)
 	screen = Screen.EDITOR
 	board.visible = false
+	if editor and is_instance_valid(editor) and testing_from_editor:
+		testing_from_editor = false
+		editor.resume()
+		_set_ui_theme(world.theme)
+		return
+	_close_editor()
 	editor = LevelEditor.new()
 	ui_root.add_child(editor)
-	screen_node = editor
-	editor.test_play.connect(func(l): play_level(l, true))
-	editor.exit.connect(func(): go_select())
+	editor.test_play.connect(func(l):
+		editor.suspend()
+		play_level(l, true))
+	editor.exit.connect(func():
+		_close_editor()
+		go_select())
 	editor.palette_changed.connect(func(): _set_ui_theme(world.theme))
-	editor.open(world, director, lvl if lvl else null)
+	_set_ui_theme(ThemePalette.get_theme(lvl.theme if lvl else "dawn"))
+	editor.open(world, director, lvl)
 	_set_ui_theme(world.theme)
+
+
+func _close_editor() -> void:
+	if editor and is_instance_valid(editor):
+		editor.queue_free()
+	editor = null

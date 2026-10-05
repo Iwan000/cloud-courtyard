@@ -151,6 +151,94 @@ func load_level(lvl: LevelData, hidden := false, frame_offset := Vector2.ZERO) -
 		tr.scale = Vector3.ONE * (0.001 if hidden else 1.0)
 
 
+## 编辑器用：只重建建筑与 AO（云、浮岛、取景保持不变），即时生效。
+func rebuild_monument(lvl: LevelData) -> void:
+	level = lvl
+	if monument:
+		remove_child(monument)
+		monument.free()
+	builder = MonumentBuilder.new(lvl, mats)
+	monument = builder.build()
+	add_child(monument)
+	builder.build_ao_map()
+	set_build(1.0)
+	for w in builder.water_nodes:
+		w.set_instance_shader_parameter("flow", 1.0)
+
+
+# ---------------------------------------------------------------------------
+# 视角：等轴 / 俯视（编辑器）
+# ---------------------------------------------------------------------------
+
+var _iso_basis: Basis
+var _view_blend := 0.0
+var _view_tween: Tween
+## 编辑器画布尺寸（非零时视角切换过程中持续重新取景）
+var canvas_dims := Vector2i.ZERO
+
+
+## 0 = 等轴，1 = 正上方俯视（网格与 XSB 文本方向一致）
+func set_top_down(on: bool, animate := true) -> void:
+	if _iso_basis == Basis():
+		_iso_basis = camera.basis
+	if _view_tween and _view_tween.is_valid():
+		_view_tween.kill()
+	var goal := 1.0 if on else 0.0
+	if animate:
+		_view_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+		_view_tween.tween_method(_apply_view_blend, _view_blend, goal, 0.6)
+	else:
+		_apply_view_blend(goal)
+
+
+func _apply_view_blend(v: float) -> void:
+	_view_blend = v
+	var top := Basis.from_euler(Vector3(deg_to_rad(-89.9), 0.0, 0.0))
+	camera.basis = Basis(_iso_basis.get_rotation_quaternion().slerp(top.get_rotation_quaternion(), v))
+	_update_camera()
+	if canvas_dims != Vector2i.ZERO:
+		frame_canvas(canvas_dims.x, canvas_dims.y)
+	if decor:
+		decor.visible = v < 0.5
+
+
+func is_top_down() -> bool:
+	return _view_blend > 0.5
+
+
+## 编辑器画布可用的屏幕区域（归一化坐标，避开两侧与上下的面板）
+var canvas_region := Rect2(0.17, 0.13, 0.6, 0.76)
+
+
+## 让相机把整个画布框进 canvas_region，不随内容变化。
+func frame_canvas(w: int, h: int, margin := 1.06) -> void:
+	var pts: Array[Vector3] = []
+	for y in [-0.8, 1.6]:
+		pts.append(Vector3(-0.5, y, -0.5))
+		pts.append(Vector3(w - 0.5, y, -0.5))
+		pts.append(Vector3(-0.5, y, h - 0.5))
+		pts.append(Vector3(w - 0.5, y, h - 0.5))
+	var basis_inv := camera.basis.inverse()
+	var mn := Vector2(INF, INF)
+	var mx := Vector2(-INF, -INF)
+	for p in pts:
+		var q := basis_inv * p
+		mn = Vector2(minf(mn.x, q.x), minf(mn.y, q.y))
+		mx = Vector2(maxf(mx.x, q.x), maxf(mx.y, q.y))
+	var vp := get_viewport().get_visible_rect().size
+	var aspect := vp.x / maxf(vp.y, 1.0)
+	var extent := (mx - mn) * margin
+	var r := canvas_region
+	cam_size = maxf(extent.y / r.size.y, extent.x / (r.size.x * aspect))
+	var c := (mn + mx) * 0.5
+	var rc := r.get_center()
+	var cx := c.x - (rc.x - 0.5) * cam_size * aspect
+	var cy := c.y + (rc.y - 0.5) * cam_size
+	cam_target = camera.basis * Vector3(cx, cy, 0.0)
+	framed_target = cam_target
+	framed_size = cam_size
+
+
 ## 入场进度：0 = 沉在云下，1 = 完全升起。
 func set_build(t: float) -> void:
 	if monument == null:

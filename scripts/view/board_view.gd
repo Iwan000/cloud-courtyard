@@ -75,6 +75,7 @@ func setup(st: SokobanState, material_lib: ThemePalette.MaterialLib, theme_dict:
 	add_child(character)
 	character.build(mats)
 	character.position = cell_pos(st.player)
+	character.visible = st.level.is_floor(st.player)
 	_target_yaw = Character.yaw_for_dir(Vector2i(0, 1))
 	character.rotation.y = _target_yaw
 	_build_cursor()
