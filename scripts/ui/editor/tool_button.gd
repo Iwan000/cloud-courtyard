@@ -46,7 +46,7 @@ func _draw() -> void:
 	_draw_icon(c)
 	var font := UiKit.font(500)
 	draw_string(font, Vector2(64, size.y * 0.5 + 8), caption, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, ink)
-	var f2 := UiKit.font(500, true)
+	var f2 := UiKit.font(500)
 	draw_string(f2, Vector2(size.x - 30, size.y * 0.5 + 7), hotkey, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(ink, 0.45))
 
 

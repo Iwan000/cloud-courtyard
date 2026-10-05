@@ -10,7 +10,7 @@ const SETTINGS_PATH := "user://settings.json"
 
 ## 内置关卡（按文件名排序）
 var builtin: Array[LevelData] = []
-## 工坊关卡（编辑器保存）
+## 自制庭院（编辑器保存的关卡）
 var custom: Array[LevelData] = []
 ## 进度：id -> {completed: bool, best_moves: int, best_pushes: int}
 var progress := {}
@@ -39,6 +39,7 @@ const INPUT_MAP := {
 	"restart": [KEY_R, JOY_BUTTON_BACK],
 	"pause": [KEY_ESCAPE, JOY_BUTTON_START],
 	"hint": [KEY_H],
+	"toggle_view": [KEY_TAB, KEY_V],
 }
 
 
@@ -47,10 +48,9 @@ func _register_input() -> void:
 		if InputMap.has_action(action):
 			InputMap.erase_action(action)
 		InputMap.add_action(action)
-		var keys: Array = INPUT_MAP[action]
-		for i in keys.size():
-			var code: int = keys[i]
-			if i == keys.size() - 1 and action != "hint":
+		for code: int in INPUT_MAP[action]:
+			# 手柄按钮编号都很小（< 32），键盘键码都不小于 32
+			if code < 32:
 				var jb := InputEventJoypadButton.new()
 				jb.button_index = code as JoyButton
 				InputMap.action_add_event(action, jb)
@@ -139,7 +139,7 @@ func load_custom_levels() -> void:
 			custom.append(lvl)
 
 
-## 保存工坊关卡；id 为空时自动分配。返回保存后的 id。
+## 保存自制关卡；id 为空时自动分配。返回保存后的 id。
 func save_custom_level(lvl: LevelData) -> String:
 	DirAccess.make_dir_recursive_absolute(CUSTOM_DIR)
 	if lvl.id == "" or not lvl.id.begins_with("custom_"):

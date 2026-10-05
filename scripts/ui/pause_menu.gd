@@ -13,7 +13,7 @@ var _first: MvButton
 
 func build(in_editor_test := false) -> void:
 	build_base(480)
-	add_title("片刻休憩", "Paused")
+	add_title("片刻休憩")
 	_first = add_button("继续", func(): resume.emit())
 	add_button("重新开始", func(): restart.emit())
 	add_button("设置", func(): settings.emit())

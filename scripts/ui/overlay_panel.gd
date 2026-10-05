@@ -52,10 +52,8 @@ func close() -> void:
 	closed.emit()
 
 
-func add_title(text: String, en := "") -> void:
-	content.add_child(UiKit.label(text, 38, 600))
-	if en != "":
-		content.add_child(UiKit.label(en, 22, 400, Color(UiKit.ink, 0.65), true, true))
+func add_title(text: String) -> void:
+	content.add_child(UiKit.label(text, 36, 700))
 	var sp := Control.new()
 	sp.custom_minimum_size.y = 14
 	content.add_child(sp)

@@ -50,6 +50,7 @@ func _ready() -> void:
 	controller.restart_requested.connect(_restart)
 	controller.pause_requested.connect(_open_pause)
 	controller.hint_requested.connect(_hint)
+	controller.view_toggle_requested.connect(_toggle_view)
 
 	ui = CanvasLayer.new()
 	ui.layer = 10
@@ -92,6 +93,8 @@ func _ready() -> void:
 					_open_settings()
 				"hint":
 					_hint()
+				"topdown":
+					_toggle_view()
 	elif args.get("screen", "") == "select":
 		go_select(args.get("select", ""))
 	elif args.get("screen", "") == "editor":
@@ -126,6 +129,7 @@ func _clear_screen() -> void:
 func _show_scenery(lvl: LevelData, offset: Vector2) -> void:
 	if world.monument and (world.level != lvl or board.visible):
 		await director.play_outro(board.visible)
+	world.set_top_down(false, false)
 	board.visible = false
 	world.load_level(lvl, true, offset)
 	_set_ui_theme(world.theme)
@@ -202,6 +206,7 @@ func _preview(lvl: LevelData) -> void:
 		if world.monument:
 			await director.play_outro(board.visible)
 		board.visible = false
+		world.set_top_down(false, false)
 		if screen != Screen.SELECT:
 			break
 		world.load_level(l, true, Vector2(0.2, 0.0), 1.22)
@@ -233,6 +238,7 @@ func play_level(lvl: LevelData, from_editor := false) -> void:
 	current_level = lvl
 	if world.monument:
 		await director.play_outro(board.visible)
+	world.set_top_down(false, false)
 	world.load_level(lvl, true)
 	_set_ui_theme(world.theme)
 	state = SokobanState.new(lvl)
@@ -242,8 +248,7 @@ func play_level(lvl: LevelData, from_editor := false) -> void:
 	var idx := Game.builtin_index(lvl)
 	var card := TitleCard.new()
 	ui_root.add_child(card)
-	card.show_card(UiKit.roman(idx + 1) if idx >= 0 else "", lvl.name,
-		lvl.name_en if lvl.name_en != "" else ThemePalette.get_theme(lvl.theme)["title_en"])
+	card.show_card(UiKit.roman(idx + 1) if idx >= 0 else "", lvl.name)
 	await director.play_intro(true)
 	hud = Hud.new()
 	ui_root.add_child(hud)
@@ -252,12 +257,21 @@ func play_level(lvl: LevelData, from_editor := false) -> void:
 	hud.restart_pressed.connect(_restart)
 	hud.menu_pressed.connect(_open_pause)
 	hud.hint_pressed.connect(_hint)
+	hud.view_pressed.connect(_toggle_view)
 	hud.show_objective("将 %d 只石箱推到发光的印记上" % lvl.boxes.size())
 	controller.begin(state, board, world)
 	_transitioning = false
 	if lvl.has_meta("autoplay") and lvl.solution != "":
 		hud.show_objective("演示最优解：%d 步" % lvl.solution.length(), 2.5)
 		controller.play_lurd(lvl.solution)
+
+
+## 关卡内切换俯视视角（Tab / V）。
+func _toggle_view() -> void:
+	if screen != Screen.PLAY:
+		return
+	world.set_top_down(not world.is_top_down())
+	Sfx.play("ui_click")
 
 
 func _restart() -> void:
@@ -395,6 +409,7 @@ func go_editor(lvl: LevelData) -> void:
 	director.stop_camera()
 	screen = Screen.EDITOR
 	board.visible = false
+	world.set_top_down(false, false)
 	if editor and is_instance_valid(editor) and testing_from_editor:
 		testing_from_editor = false
 		editor.resume()

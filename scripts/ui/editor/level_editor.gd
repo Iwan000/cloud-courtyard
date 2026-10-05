@@ -1,11 +1,11 @@
 class_name LevelEditor
 extends Control
-## 庭院工坊（关卡编辑器）。
+## 关卡编辑器。
 ##
 ## 与游戏共用同一套渲染与程序化建筑：每一笔修改都会立即重建建筑，所见即所得。
 ## 功能：绘制工具（地板/墙/石箱/印记/旅人/擦除）、拖拽连续绘制、Shift 矩形填充、右键擦除、
 ## 按笔划撤销/重做、画布尺寸调整、自动围墙、主题与建筑种子、等轴/俯视切换、
-## 实时校验、后台求解验证（最优步数）、试玩、保存到工坊、XSB 导入导出（剪贴板）。
+## 实时校验、后台求解验证（最优步数）、试玩、保存为自制庭院、XSB 导入导出（剪贴板）。
 
 signal test_play(lvl: LevelData)
 signal exit
@@ -223,11 +223,9 @@ func _build_ui() -> void:
 	var back := UiKit.icon_button("back", "返回 (Esc)")
 	back.pressed.connect(_request_exit)
 	top.add_child(back)
-	var title_box := VBoxContainer.new()
-	title_box.add_theme_constant_override("separation", -4)
-	title_box.add_child(UiKit.label("庭院工坊", 34, 600))
-	title_box.add_child(UiKit.label("Courtyard Workshop", 19, 400, Color(UiKit.ink, 0.6), true, true))
-	top.add_child(title_box)
+	var title := UiKit.label("关卡编辑器", 32, 700)
+	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	top.add_child(title)
 	var sp := Control.new()
 	sp.custom_minimum_size.x = 24
 	top.add_child(sp)
@@ -787,7 +785,7 @@ func _save() -> void:
 	_saved_hash = lvl.content_hash()
 	_dirty = false
 	Sfx.play("target_on", 1.2, -6.0)
-	toast("已保存到工坊：%s" % out.name + ("" if out.par_moves > 0 else "（建议先求解验证）"))
+	toast("已保存到“自制庭院”：%s" % out.name + ("" if out.par_moves > 0 else "（建议先求解验证）"))
 
 
 func _test() -> void:

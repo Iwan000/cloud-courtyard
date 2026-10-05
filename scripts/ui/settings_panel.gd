@@ -7,7 +7,7 @@ var _first: Control
 
 func build() -> void:
 	build_base(560)
-	add_title("设置", "Settings")
+	add_title("设置")
 	_first = _slider_row("音乐", "music")
 	_slider_row("音效", "sfx")
 	_toggle_row("全屏", "fullscreen")

@@ -1,11 +1,10 @@
 class_name UiKit
 extends RefCounted
 ## UI 风格套件：字体、配色、Theme，以及常用控件的构造函数。
-## 视觉语言：衬线字体、纯文字按钮（悬停时下划线从中间展开）、半透明白色面板、细线分隔。
+## 视觉语言：规整的黑体、纯文字按钮（悬停时下划线从中间展开）、半透明白色面板、细线分隔。
 
-const FONT_CJK_PATH := "res://fonts/NotoSerifSC-Subset.ttf"
-const FONT_LATIN_PATH := "res://fonts/CormorantGaramond-Subset.ttf"
-const FONT_LATIN_ITALIC_PATH := "res://fonts/CormorantGaramond-Italic-Subset.ttf"
+const FONT_DIR := "res://fonts/"
+const WEIGHTS: PackedInt32Array = [400, 500, 600, 700]
 
 static var _fonts := {}
 static var ink := Color("4b3d5e")          ## 主文字色（随主题变化）
@@ -13,29 +12,16 @@ static var ink_soft := Color("4b3d5e", 0.62)
 static var accent := Color("e07a86")
 
 
-static func _font_file(path: String) -> Font:
-	if ResourceLoader.exists(path):
-		return load(path)
-	return ThemeDB.fallback_font
-
-
-## weight: 300~900；latin=true 使用西文衬线字体（中文自动回退到思源宋体）。
-static func font(weight := 400, latin := false, italic := false) -> Font:
-	var key := "%d_%s_%s" % [weight, latin, italic]
-	if _fonts.has(key):
-		return _fonts[key]
-	var cjk := _font_file(FONT_CJK_PATH)
-	var fv := FontVariation.new()
-	if latin:
-		fv.base_font = _font_file(FONT_LATIN_ITALIC_PATH if italic else FONT_LATIN_PATH)
-		fv.fallbacks = [cjk]
-		# Cormorant 默认是旧式数字（0 像 o），改用等高数字
-		fv.opentype_features = {"lnum": 1}
-	else:
-		fv.base_font = cjk
-	fv.variation_opentype = {"wght": weight}
-	_fonts[key] = fv
-	return fv
+## 全部文字使用思源黑体（静态字重 400/500/600/700）：笔画粗细均匀、形状规整，与几何化的建筑风格一致。
+static func font(weight := 500) -> Font:
+	var w := WEIGHTS[0]
+	for candidate in WEIGHTS:
+		if absi(candidate - weight) < absi(w - weight):
+			w = candidate
+	if not _fonts.has(w):
+		var path := FONT_DIR + "NotoSansSC-%d.ttf" % w
+		_fonts[w] = load(path) if ResourceLoader.exists(path) else ThemeDB.fallback_font
+	return _fonts[w]
 
 
 ## 根据主题设置文字颜色（夜景用浅色）。
@@ -51,7 +37,7 @@ static func set_theme_colors(theme: Dictionary) -> void:
 
 static func make_theme() -> Theme:
 	var t := Theme.new()
-	t.default_font = font(400)
+	t.default_font = font(500)
 	t.default_font_size = 22
 	t.set_color("font_color", "Label", ink)
 	for cls in ["Button", "CheckBox", "LineEdit", "OptionButton"]:
@@ -143,10 +129,10 @@ static func panel_style(alpha := 0.62, radius := 22) -> StyleBoxFlat:
 	return s
 
 
-static func label(text: String, size := 22, weight := 400, color := Color(0, 0, 0, 0), latin := false, italic := false) -> Label:
+static func label(text: String, size := 22, weight := 500, color := Color(0, 0, 0, 0)) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_override("font", font(weight, latin, italic))
+	l.add_theme_font_override("font", font(weight))
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", ink if color.a == 0.0 else color)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE

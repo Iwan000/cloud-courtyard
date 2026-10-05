@@ -128,6 +128,17 @@ func _real_input_flow() -> void:
 	_key(KEY_Z, false)
 	await _wait_until(func(): return not main.board.is_busy(), 3.0)
 	_check(st.player == start and st.moves == 0, "keyboard undo")
+	# Tab：切换到俯视视角，再切回
+	_key(KEY_TAB, true)
+	await get_tree().process_frame
+	_key(KEY_TAB, false)
+	await get_tree().create_timer(0.8).timeout
+	_check(main.world.is_top_down(), "Tab switches to top-down view")
+	_key(KEY_TAB, true)
+	await get_tree().process_frame
+	_key(KEY_TAB, false)
+	await get_tree().create_timer(0.8).timeout
+	_check(not main.world.is_top_down(), "Tab switches back")
 	# 鼠标：点击一个两步以上可达的地板格，旅人应自动走到那里
 	var goal := Vector2i(-1, -1)
 	var reach := Pathfinder.reachable(st)

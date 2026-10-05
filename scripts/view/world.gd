@@ -212,6 +212,8 @@ func _apply_view_blend(v: float) -> void:
 	_update_camera()
 	if canvas_dims != Vector2i.ZERO:
 		frame_canvas(canvas_dims.x, canvas_dims.y)
+	elif level:
+		frame_level(_frame_margin, _frame_offset)
 	if decor:
 		decor.visible = v < 0.5
 

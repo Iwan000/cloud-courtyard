@@ -28,11 +28,10 @@ func build(select_id := "") -> void:
 	add_child(back_btn)
 	UiKit.pin(back_btn, 0.0, 0.0, 48, 40)
 
-	var head := UiKit.label("选择庭院", 44, 600)
+	var head := UiKit.label("选择庭院", 44, 700)
 	col.add_child(head)
-	col.add_child(UiKit.label("Choose a courtyard", 24, 400, Color(UiKit.ink, 0.65), true, true))
 	var sp := Control.new()
-	sp.custom_minimum_size.y = 26
+	sp.custom_minimum_size.y = 30
 	col.add_child(sp)
 
 	for i in Game.builtin.size():
@@ -44,7 +43,7 @@ func build(select_id := "") -> void:
 		var sp2 := Control.new()
 		sp2.custom_minimum_size.y = 18
 		col.add_child(sp2)
-		col.add_child(UiKit.label("工 坊", 18, 600, Color(UiKit.ink, 0.55)))
+		col.add_child(UiKit.label("自制庭院", 18, 600, Color(UiKit.ink, 0.55)))
 		var scroll := ScrollContainer.new()
 		scroll.custom_minimum_size = Vector2(520, mini(Game.custom.size(), 3) * 54)
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -95,19 +94,7 @@ func _add_entry(parent: Control, lvl: LevelData, numeral: String, locked: bool, 
 	b.focus_entered.connect(func():
 		if _selected != idx:
 			_select(idx))
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 14)
-	row.add_child(b)
-	var status := ""
-	if locked:
-		status = "未解锁"
-	elif Game.is_completed(lvl.id):
-		var best := Game.best_moves(lvl.id)
-		status = "✓  %d 步" % best if best > 0 else "✓"
-	var s := UiKit.label(status, 17, 400, Color(UiKit.ink, 0.5))
-	s.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(s)
-	parent.add_child(row)
+	parent.add_child(b)
 	_entries.append({"lvl": lvl, "button": b, "locked": locked, "custom": is_custom})
 
 
@@ -126,19 +113,6 @@ func _rebuild_detail() -> void:
 		c.queue_free()
 	var e: Dictionary = _entries[_selected]
 	var lvl: LevelData = e["lvl"]
-	var th := ThemePalette.get_theme(lvl.theme)
-	var en := UiKit.label(lvl.name_en if lvl.name_en != "" else th["title_en"], 30, 400, Color(UiKit.ink, 0.8), true, true)
-	en.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_detail.add_child(en)
-	var info_parts: Array[String] = ["%s · %s" % [th["title"], th["title_en"]], "%d 个石箱" % lvl.boxes.size()]
-	if lvl.par_moves > 0:
-		info_parts.append("参考 %d 步" % lvl.par_moves)
-	var info := UiKit.label("   ·   ".join(info_parts), 18, 400, Color(UiKit.ink, 0.6))
-	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_detail.add_child(info)
-	var sp := Control.new()
-	sp.custom_minimum_size.y = 12
-	_detail.add_child(sp)
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_END
 	row.add_theme_constant_override("separation", 34)
@@ -152,8 +126,7 @@ func _rebuild_detail() -> void:
 	_play_button.pressed.connect(_activate)
 	row.add_child(_play_button)
 	_detail.add_child(row)
-	for c in _detail.get_children():
-		UiKit.appear(c, 0.05)
+	UiKit.appear(row, 0.05)
 
 
 func _activate() -> void:

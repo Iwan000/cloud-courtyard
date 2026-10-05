@@ -8,7 +8,7 @@ const PILLAR_SHADER := preload("res://shaders/light_pillar.gdshader")
 
 var _quad: QuadMesh
 var _mats := {}       # shape -> ShaderMaterial
-var _pillar_mesh: CylinderMesh
+var _pillar_mesh: ArrayMesh
 var _pillar_mat: ShaderMaterial
 var rng := RandomNumberGenerator.new()
 
@@ -21,13 +21,7 @@ func _ready() -> void:
 		m.shader = SPRITE_SHADER
 		m.set_shader_parameter("shape", shape)
 		_mats[shape] = m
-	_pillar_mesh = CylinderMesh.new()
-	_pillar_mesh.top_radius = 0.42
-	_pillar_mesh.bottom_radius = 0.46
-	_pillar_mesh.height = 1.0
-	_pillar_mesh.cap_top = false
-	_pillar_mesh.cap_bottom = false
-	_pillar_mesh.radial_segments = 24
+	_pillar_mesh = _square_frame_mesh(0.5)
 	_pillar_mat = ShaderMaterial.new()
 	_pillar_mat.shader = PILLAR_SHADER
 	rng.randomize()
@@ -94,7 +88,26 @@ func sparkles(at: Vector3, color: Color, count := 14, radius := 0.45, height := 
 		tw.chain().tween_callback(mi.queue_free)
 
 
-## 光柱：自地面升起后淡出。
+## 方形光框：沿印记的方形外缘竖起的四面光幕（高 1，底边中心在原点），与石箱的方形轮廓一致。
+static func _square_frame_mesh(half: float) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var corners := [Vector3(-half, 0, -half), Vector3(half, 0, -half), Vector3(half, 0, half), Vector3(-half, 0, half)]
+	for i in 4:
+		var a: Vector3 = corners[i]
+		var b: Vector3 = corners[(i + 1) % 4]
+		var u0 := i * 0.25
+		var u1 := u0 + 0.25
+		# UV.y：0 在顶部，1 在底部（光幕自下而上淡出）
+		var quad := [[a + Vector3(0, -0.5, 0), Vector2(u0, 1)], [b + Vector3(0, -0.5, 0), Vector2(u1, 1)],
+			[b + Vector3(0, 0.5, 0), Vector2(u1, 0)], [a + Vector3(0, 0.5, 0), Vector2(u0, 0)]]
+		for k in [0, 1, 2, 0, 2, 3]:
+			st.set_uv(quad[k][1])
+			st.add_vertex(quad[k][0])
+	return st.commit()
+
+
+## 光框：自地面升起后淡出。
 func light_pillar(at: Vector3, color: Color, height := 2.6) -> void:
 	var mi := MeshInstance3D.new()
 	mi.mesh = _pillar_mesh
@@ -107,7 +120,7 @@ func light_pillar(at: Vector3, color: Color, height := 2.6) -> void:
 	mi.set_instance_shader_parameter("intensity", 1.0)
 	var tw := mi.create_tween()
 	tw.set_parallel()
-	tw.tween_property(mi, "scale", Vector3(0.9, height, 0.9), 0.5).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(mi, "scale", Vector3(1.0, height, 1.0), 0.5).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tw.tween_property(mi, "position", at + Vector3(0, height * 0.5, 0), 0.5).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tw.chain().tween_method(func(v: float): mi.set_instance_shader_parameter("intensity", v), 1.0, 0.0, 0.9)
 	tw.chain().tween_callback(mi.queue_free)

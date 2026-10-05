@@ -1,6 +1,6 @@
 class_name CompletePanel
 extends Control
-## 通关结算：庭院已苏醒。显示步数、推动、最佳与参考，以及三枚花瓣评价。
+## 通关结算：庭院已苏醒。显示步数、最佳与参考步数，以及三枚花瓣评价。
 
 const SHADE_SHADER := preload("res://shaders/ui_bottom_shade.gdshader")
 
@@ -11,7 +11,7 @@ signal select_pressed
 var _first: MvButton
 
 
-func build(lvl: LevelData, moves: int, pushes: int, best: int, new_record: bool, has_next: bool, in_editor_test := false) -> void:
+func build(lvl: LevelData, moves: int, _pushes: int, best: int, new_record: bool, has_next: bool, in_editor_test := false) -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# 底部柔和渐变底，衬托文字
@@ -32,12 +32,9 @@ func build(lvl: LevelData, moves: int, pushes: int, best: int, new_record: bool,
 	add_child(box)
 	UiKit.pin(box, 0.5, 1.0, 0, -64)
 
-	var title := UiKit.glow(UiKit.label("庭院已苏醒", 50, 600))
+	var title := UiKit.glow(UiKit.label("庭院已苏醒", 48, 700))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
-	var en := UiKit.label("The courtyard awakens", 26, 400, Color(UiKit.ink, 0.7), true, true)
-	en.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(en)
 
 	var rating := _rating(moves, lvl.par_moves)
 	var petals := Petals.new()
@@ -46,12 +43,12 @@ func build(lvl: LevelData, moves: int, pushes: int, best: int, new_record: bool,
 	petals.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(petals)
 
-	var parts: Array[String] = ["步数 %d" % moves, "推动 %d" % pushes]
+	var parts: Array[String] = ["步数 %d" % moves]
 	if best > 0:
 		parts.append(("新纪录" if new_record else "最佳 %d" % best))
 	if lvl.par_moves > 0:
 		parts.append("参考 %d" % lvl.par_moves)
-	var stats := UiKit.label("    ·    ".join(parts), 21, 400, Color(UiKit.ink, 0.75))
+	var stats := UiKit.label("    ·    ".join(parts), 21, 500, Color(UiKit.ink, 0.75))
 	stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(stats)
 	var sp := Control.new()

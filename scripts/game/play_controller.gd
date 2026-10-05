@@ -8,6 +8,7 @@ signal counters_changed(moves: int, pushes: int)
 signal restart_requested
 signal pause_requested
 signal hint_requested
+signal view_toggle_requested
 
 const DIR_ACTIONS: PackedStringArray = ["move_up", "move_right", "move_down", "move_left"]
 const HOLD_DELAY := 0.2
@@ -71,6 +72,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		restart_requested.emit()
 	elif event.is_action_pressed("hint"):
 		hint_requested.emit()
+	elif event.is_action_pressed("toggle_view"):
+		view_toggle_requested.emit()
+		get_viewport().set_input_as_handled()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_click(event.position)
 	elif event is InputEventMouseMotion:

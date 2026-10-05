@@ -1,4 +1,5 @@
-"""字体子集化：只保留游戏中实际用到的字形，把 25MB 的思源宋体压到几百 KB。
+"""字体子集化：只保留游戏中实际用到的字形，把 17MB 的思源黑体（Noto Sans SC，可变字重）
+压成几个各约 300 KB 的静态字重文件。
 
 扫描 scripts/ 下所有 .gd 和 levels/ 下所有 .json 中出现的字符，再加上常用标点与 ASCII，
 用 fontTools 生成子集（保留可变字重轴）。编辑器中用户输入的其它汉字由系统字体回退显示。
@@ -10,6 +11,11 @@ import sys
 
 from fontTools import subset
 from fontTools.ttLib import TTFont
+from fontTools.varLib import instancer
+
+# 导出的静态字重（游戏中实际用到的几档）。可变字体的默认实例是 Thin，
+# 直接交给引擎时字重轴未必生效，所以在这里固定成静态字体。
+WEIGHTS = (400, 500, 600, 700)
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "fonts_src"
@@ -46,13 +52,21 @@ def make_subset(src: pathlib.Path, dst: pathlib.Path, text: str) -> None:
           + (f" (e.g. {''.join(missing[:20])})" if missing else ""))
 
 
+def make_static(variable: pathlib.Path, weight: int, dst: pathlib.Path) -> None:
+    font = TTFont(variable)
+    static = instancer.instantiateVariableFont(font, {"wght": weight})
+    static.save(dst)
+    print(f"{dst.name}: {dst.stat().st_size / 1024:.0f} KB")
+
+
 def main() -> None:
     text = collect_chars()
-    latin = "".join(c for c in text if ord(c) < 0x2000) + "·—–’‘“”…"
     OUT.mkdir(exist_ok=True)
-    make_subset(SRC / "NotoSerifSC.ttf", OUT / "NotoSerifSC-Subset.ttf", text)
-    make_subset(SRC / "CormorantGaramond.ttf", OUT / "CormorantGaramond-Subset.ttf", latin)
-    make_subset(SRC / "CormorantGaramond-Italic.ttf", OUT / "CormorantGaramond-Italic-Subset.ttf", latin)
+    tmp = OUT / "_NotoSansSC-Subset-VF.ttf"
+    make_subset(SRC / "NotoSansSC.ttf", tmp, text)
+    for w in WEIGHTS:
+        make_static(tmp, w, OUT / f"NotoSansSC-{w}.ttf")
+    tmp.unlink()
 
 
 if __name__ == "__main__":
