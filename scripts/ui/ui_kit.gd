@@ -29,6 +29,8 @@ static func font(weight := 400, latin := false, italic := false) -> Font:
 	if latin:
 		fv.base_font = _font_file(FONT_LATIN_ITALIC_PATH if italic else FONT_LATIN_PATH)
 		fv.fallbacks = [cjk]
+		# Cormorant 默认是旧式数字（0 像 o），改用等高数字
+		fv.opentype_features = {"lnum": 1}
 	else:
 		fv.base_font = cjk
 	fv.variation_opentype = {"wght": weight}
@@ -212,7 +214,7 @@ static func pin(c: Control, ax: float, ay: float, ox := 0.0, oy := 0.0) -> void:
 
 
 ## 给文字加一圈柔和的背景色光晕，保证在 3D 场景上可读。
-static func glow(l: Label, alpha := 0.55, size := 14) -> Label:
+static func glow(l: Label, alpha := 0.45, size := 10) -> Label:
 	var night := ink.get_luminance() > 0.6
 	l.add_theme_color_override("font_shadow_color", Color(0.1, 0.08, 0.25, alpha) if night else Color(1, 1, 1, alpha))
 	l.add_theme_constant_override("shadow_outline_size", size)

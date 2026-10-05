@@ -79,6 +79,14 @@ func _ready() -> void:
 				solver.solve(lvl)
 				lurd = solver.solution
 			controller.play_lurd(lurd)
+		if args.has("open"):
+			match args["open"]:
+				"pause":
+					_open_pause()
+				"settings":
+					_open_settings()
+				"hint":
+					_hint()
 	elif args.get("screen", "") == "select":
 		go_select()
 	elif args.get("screen", "") == "editor":
@@ -281,9 +289,10 @@ func _show_hint(res: Dictionary) -> void:
 			for d in walk:
 				p += SokobanState.DIRS[d]
 			var box_cell: Vector2i = p + SokobanState.DIRS[res["push_dir"]]
-			board.show_cursor(box_cell, walk)
+			board.show_hint(state.box_at(box_cell), res["push_dir"], walk)
 			var dir_names := ["右上", "右下", "左下", "左上"]
-			hud.show_objective("提示：走到虚线终点，把石箱向%s推" % dir_names[res["push_dir"]], 2.5)
+			var how := "沿虚线走过去，" if not walk.is_empty() else ""
+			hud.show_objective("提示：%s把发光的石箱向%s推" % [how, dir_names[res["push_dir"]]], 2.5)
 		SokobanSolver.Status.UNSOLVABLE:
 			hud.show_objective("此局已无解——试试撤销（Z）或重来（R）", 3.0)
 		_:

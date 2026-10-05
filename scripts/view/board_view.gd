@@ -105,6 +105,7 @@ func is_busy() -> bool:
 # ---------------------------------------------------------------------------
 
 func play(r: SokobanState.MoveResult) -> void:
+	clear_hint()
 	var kind := "bump"
 	var dur := BUMP_TIME
 	if r.moved:
@@ -442,3 +443,67 @@ func cheer() -> void:
 	tw.tween_property(character, "position:y", 0.0, 0.25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw.tween_interval(0.9)
 	tw.tween_property(character, "cheer", 0.0, 0.5)
+
+
+
+# ---------------------------------------------------------------------------
+# 提示
+# ---------------------------------------------------------------------------
+
+var _hint_arrow: Node3D
+var _hint_box := -1
+
+
+## 显示提示：行走路径（虚线点）+ 石箱上方指示推动方向的浮动箭头 + 石箱脉动发光。
+func show_hint(box_id: int, push_dir: int, walk: Array[int]) -> void:
+	clear_hint()
+	var stand := state.boxes[box_id] - SokobanState.DIRS[push_dir]
+	if not walk.is_empty():
+		show_cursor(stand, walk)
+		_cursor.visible = true
+	_hint_box = box_id
+	_hint_arrow = Node3D.new()
+	var k := MeshKit.new()
+	k.uv2 = Vector2.ZERO
+	# 平放的人字形箭头（指向 +Z），由两段扁长方体组成
+	var arrow_mat := StandardMaterial3D.new()
+	arrow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	arrow_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	arrow_mat.albedo_color = Color(1, 1, 1, 0.92)
+	arrow_mat.no_depth_test = true
+	arrow_mat.render_priority = 2
+	for side in [-1.0, 1.0]:
+		var a := Vector3(side * 0.3, 0, -0.12)
+		var b := Vector3(0, 0, 0.2)
+		var mid := (a + b) * 0.5
+		var seg := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.11, 0.05, (b - a).length() + 0.08)
+		bm.material = arrow_mat
+		seg.mesh = bm
+		seg.position = mid
+		seg.rotation.y = atan2(b.x - a.x, b.z - a.z)
+		_hint_arrow.add_child(seg)
+	var d: Vector2i = SokobanState.DIRS[push_dir]
+	_hint_arrow.rotation.y = atan2(float(d.x), float(d.y))
+	var base := cell_pos(state.boxes[box_id], Props.BOX_SIZE + 0.55)
+	_hint_arrow.position = base
+	add_child(_hint_arrow)
+	var tw := _hint_arrow.create_tween().set_loops(6)
+	var dir3 := Vector3(d.x, 0, d.y)
+	tw.tween_property(_hint_arrow, "position", base + dir3 * 0.18, 0.45).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(_hint_arrow, "position", base, 0.45).set_trans(Tween.TRANS_SINE)
+	tw.finished.connect(clear_hint)
+	var bt := create_tween().set_loops(3)
+	var mi := box_nodes[box_id].get_child(0) as MeshInstance3D
+	bt.tween_method(func(v: float): mi.set_instance_shader_parameter("glow", v), 0.0, 0.9, 0.45)
+	bt.tween_method(func(v: float): mi.set_instance_shader_parameter("glow", v), 0.9, _box_glow[box_id], 0.45)
+
+
+func clear_hint() -> void:
+	if _hint_arrow and is_instance_valid(_hint_arrow):
+		_hint_arrow.queue_free()
+	_hint_arrow = null
+	if _hint_box >= 0 and _hint_box < box_nodes.size():
+		(box_nodes[_hint_box].get_child(0) as MeshInstance3D).set_instance_shader_parameter("glow", _box_glow[_hint_box])
+	_hint_box = -1
