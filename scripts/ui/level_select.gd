@@ -82,7 +82,7 @@ func _add_entry(parent: Control, lvl: LevelData, numeral: String, locked: bool, 
 	var b := MvButton.new()
 	var title := "%s   %s" % [numeral, lvl.name]
 	b.setup(title, 30 if not is_custom else 24)
-	b.custom_minimum_size.x = 420
+	b.custom_minimum_size.x = 210 if not is_custom else 240
 	if locked:
 		b.text = "%s   · · ·" % numeral
 		b.modulate.a = 0.45

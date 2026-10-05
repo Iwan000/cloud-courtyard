@@ -49,6 +49,7 @@ func _ready() -> void:
 			hud.set_counters(m, p))
 	controller.restart_requested.connect(_restart)
 	controller.pause_requested.connect(_open_pause)
+	controller.hint_requested.connect(_hint)
 
 	ui = CanvasLayer.new()
 	ui.layer = 10
@@ -88,9 +89,11 @@ func _ready() -> void:
 				"hint":
 					_hint()
 	elif args.get("screen", "") == "select":
-		go_select()
+		go_select(args.get("select", ""))
 	elif args.get("screen", "") == "editor":
 		go_editor(null)
+		if args.get("open", "") == "topdown":
+			editor._toggle_view()
 	else:
 		go_title()
 
@@ -193,7 +196,7 @@ func _preview(lvl: LevelData) -> void:
 			await director.play_outro(false)
 		if screen != Screen.SELECT:
 			break
-		world.load_level(l, true, Vector2(0.24, 0.0))
+		world.load_level(l, true, Vector2(0.2, 0.0), 1.22)
 		if _is_night(world.theme) != was_night:
 			_set_ui_theme(world.theme)
 			_build_select(l.id)

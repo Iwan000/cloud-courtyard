@@ -134,7 +134,7 @@ func _setup_post() -> void:
 # ---------------------------------------------------------------------------
 
 ## 加载关卡建筑。hidden=true 时建筑停在云下（build_t = 0），等待入场动画。
-func load_level(lvl: LevelData, hidden := false, frame_offset := Vector2.ZERO) -> void:
+func load_level(lvl: LevelData, hidden := false, frame_offset := Vector2.ZERO, frame_margin := 1.06) -> void:
 	level = lvl
 	apply_theme(lvl.theme, hidden)
 	if monument:
@@ -143,9 +143,10 @@ func load_level(lvl: LevelData, hidden := false, frame_offset := Vector2.ZERO) -
 	monument = builder.build()
 	add_child(monument)
 	builder.build_ao_map()
-	frame_level(1.06, frame_offset)
+	frame_level(frame_margin, frame_offset)
 	_build_atmosphere()
 	set_build(0.0 if hidden else 1.0)
+	set_stairs(0.0 if hidden else 1.0)
 	set_water_flow(0.0 if hidden else 1.0)
 	for tr in builder.tree_nodes:
 		tr.scale = Vector3.ONE * (0.001 if hidden else 1.0)
@@ -162,6 +163,7 @@ func rebuild_monument(lvl: LevelData) -> void:
 	add_child(monument)
 	builder.build_ao_map()
 	set_build(1.0)
+	set_stairs(1.0)
 	for w in builder.water_nodes:
 		w.set_instance_shader_parameter("flow", 1.0)
 
@@ -258,6 +260,14 @@ func set_water_flow(f: float) -> void:
 	Sfx.set_water(f * minf(builder.water_cells.size(), 2) * 0.5)
 
 
+## 台阶升起进度：0 = 沉在云海深处，1 = 连接到台基的小门。
+func set_stairs(v: float) -> void:
+	if builder == null or builder.stairs_node == null:
+		return
+	builder.stairs_node.position.y = (1.0 - v) * -9.0
+	builder.stairs_node.visible = v > 0.01
+
+
 ## 窗户点亮（通关演出）
 func set_windows_lit(v: float) -> void:
 	if monument == null:
@@ -318,6 +328,9 @@ func _screen_to_world(sx: float, sy: float, depth: float) -> Vector3:
 func _spawn_islands(rng: RandomNumberGenerator) -> void:
 	var half_w := cam_size * 0.5 * 16.0 / 9.0
 	var slots := [Vector2(-0.8, 0.42), Vector2(-0.96, -0.28), Vector2(0.9, -0.12), Vector2(0.62, -0.66)]
+	if _frame_offset.x > 0.1:
+		# 左侧有界面文字（标题、选关），远景只放在右侧
+		slots = [Vector2(0.93, 0.5), Vector2(0.97, -0.25), Vector2(0.6, -0.72)]
 	for i in slots.size():
 		var slot: Vector2 = slots[i]
 		var w := rng.randi_range(3, 5)
@@ -422,6 +435,7 @@ func apply_theme(theme_id: String, animate := false) -> void:
 
 
 ## 当前关卡的标准取景（用于演出结束后复位）
+var _frame_offset := Vector2.ZERO
 var framed_target := Vector3.ZERO
 var framed_size := 12.0
 
@@ -430,6 +444,7 @@ var framed_size := 12.0
 func frame_level(margin := 1.06, offset := Vector2.ZERO) -> void:
 	if level == null:
 		return
+	_frame_offset = offset
 	var top := 1.5
 	for p in builder.top_h:
 		top = maxf(top, builder.top_h[p] + 0.9)

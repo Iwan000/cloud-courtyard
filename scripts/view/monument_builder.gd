@@ -41,6 +41,8 @@ var bounds := AABB()
 ## 需要动画的装饰节点
 var water_nodes: Array[MeshInstance3D] = []
 var tree_nodes: Array[Node3D] = []
+var stairs_node: MeshInstance3D   ## 通向云海的台阶（通关时升起）
+var _stair_kit: MeshKit
 
 const WATER_SHADER := preload("res://shaders/water.gdshader")
 
@@ -82,6 +84,13 @@ func build() -> Node3D:
 		_build_water(root)
 		_build_trees(root)
 
+	if _stair_kit and not _stair_kit.is_empty():
+		var sm := ArrayMesh.new()
+		_stair_kit.commit_to(sm, mats.get_mat("stair"))
+		stairs_node = MeshInstance3D.new()
+		stairs_node.name = "Stairs"
+		stairs_node.mesh = sm
+		root.add_child(stairs_node)
 	var mesh := ArrayMesh.new()
 	for key in kits:
 		(kits[key] as MeshKit).commit_to(mesh, mats.get_mat(key))
@@ -588,12 +597,13 @@ func _build_stairs() -> void:
 	poly.append(Vector2(u, yy - 0.42))
 	poly.append(Vector2(u0 + 0.3, y_top - 0.62))
 	poly.append(Vector2(u0 - 0.38, y_top - 0.62))
-	var sk := kit("stair")
-	sk.uv2 = Vector2(_delay_for(Vector2(first)), 1.0)
-	sk.extrude(MeshKit._dedupe(poly), origin, t, Vector3.UP, n, 0.58)
+	# 台阶单独成网格：游戏中沉在云下，通关时升起
+	_stair_kit = MeshKit.new()
+	_stair_kit.uv2 = Vector2(0.0, 0.0)
+	_stair_kit.extrude(MeshKit._dedupe(poly), origin, t, Vector3.UP, n, 0.58)
 	# 台阶顶端的小门
 	var win := kit("window")
-	win.uv2 = sk.uv2
+	win.uv2 = Vector2(_delay_for(Vector2(first)), 1.0)
 	win.decal(MeshKit.pointed_arch_shape(0.38, 0.6), origin + t * u0 + Vector3(0, y_top, 0), t, Vector3.UP, n)
 
 

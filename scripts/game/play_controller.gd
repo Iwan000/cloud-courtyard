@@ -7,6 +7,7 @@ signal solved
 signal counters_changed(moves: int, pushes: int)
 signal restart_requested
 signal pause_requested
+signal hint_requested
 
 const DIR_ACTIONS: PackedStringArray = ["move_up", "move_right", "move_down", "move_left"]
 const HOLD_DELAY := 0.2
@@ -68,6 +69,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		redo()
 	elif event.is_action_pressed("restart"):
 		restart_requested.emit()
+	elif event.is_action_pressed("hint"):
+		hint_requested.emit()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_click(event.position)
 	elif event is InputEventMouseMotion:

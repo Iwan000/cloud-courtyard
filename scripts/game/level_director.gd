@@ -37,6 +37,16 @@ func play_intro(with_board := true) -> void:
 		tt.tween_property(tr, "scale", Vector3.ONE, 0.6).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	if with_board:
 		await board.play_intro()
+	else:
+		raise_stairs(2.2)
+
+
+## 台阶从云海中升起，接到台基的小门。
+func raise_stairs(duration := 1.8) -> void:
+	if world.builder == null or world.builder.stairs_node == null:
+		return
+	var st := create_tween()
+	st.tween_method(world.set_stairs, 0.0, 1.0, duration).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 
 ## 退场演出：物件消失，建筑由外向内沉入云海。
@@ -68,6 +78,9 @@ func play_complete() -> void:
 		board.fx.petals(tr.global_position + Vector3(0, 0.5, 0), Color(world.theme["foliage"][0]), 24)
 	for w in world.builder.water_nodes:
 		board.fx.sparkles(w.global_position + Vector3(0, 0.1, 0), Color(world.theme["water"]).lerp(Color.WHITE, 0.6), 8, 0.3, 0.8)
+	# 通往云海的台阶升起：庭院与外界重新相连
+	raise_stairs(2.4)
+	get_tree().create_timer(0.6).timeout.connect(func(): Sfx.play("intro", 1.15, -6.0))
 	if _cam_tween and _cam_tween.is_valid():
 		_cam_tween.kill()
 	_cam_tween = create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
