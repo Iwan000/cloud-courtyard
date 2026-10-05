@@ -33,15 +33,19 @@ func _draw() -> void:
 	var r := 10.0
 	match icon_name:
 		"undo", "redo":
-			var sgn := -1.0 if icon_name == "undo" else 1.0
+			# 从右下起、经顶部、到左下止的圆弧（重做为镜像），箭头沿终点切线方向
+			var mirror := 1.0 if icon_name == "undo" else -1.0
+			var a0 := deg_to_rad(-40.0)
+			var a1 := deg_to_rad(200.0)
 			var pts := PackedVector2Array()
-			for i in range(13):
-				var t := PI * 1.15 * i / 12.0
-				pts.append(center + Vector2(-sgn * cos(t) * r * 0.9, sin(t) * r * 0.9 - 1) * Vector2(1, -1) + Vector2(0, 3))
+			for i in range(17):
+				var th := lerpf(a0, a1, i / 16.0)
+				pts.append(center + Vector2(cos(th) * mirror, -sin(th)) * r + Vector2(0, 2))
 			draw_polyline(pts, a, w, true)
-			var tip := pts[0]
-			draw_line(tip, tip + Vector2(sgn * 5, -5), a, w, true)
-			draw_line(tip, tip + Vector2(sgn * 6, 3), a, w, true)
+			var tip := pts[pts.size() - 1]
+			var dir := (tip - pts[pts.size() - 2]).normalized()
+			draw_line(tip, tip - dir.rotated(0.6) * 6.0, a, w, true)
+			draw_line(tip, tip - dir.rotated(-0.6) * 6.0, a, w, true)
 		"restart":
 			draw_arc(center, r, -PI * 0.35, PI * 1.45, 32, a, w, true)
 			var tip := center + Vector2(cos(-PI * 0.35), sin(-PI * 0.35)) * r
