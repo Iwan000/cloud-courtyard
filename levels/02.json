@@ -1,0 +1,21 @@
+{
+  "format": 1,
+  "id": "02",
+  "name": "水镜",
+  "name_en": "Mirror Pool",
+  "theme": "garden",
+  "seed": 3301,
+  "par_moves": 26,
+  "par_pushes": 10,
+  "solution": "uulluRRurDldRRRuLLulDrdLLL",
+  "map": [
+    "   ####",
+    "   #--#",
+    "####--####",
+    "#--$--$--#",
+    "#.------.#",
+    "####--####",
+    "   #@-#",
+    "   ####"
+  ]
+}

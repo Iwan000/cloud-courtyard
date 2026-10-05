@@ -552,7 +552,10 @@ def process(path: Path, args: argparse.Namespace) -> Report:
     if solution is None:
         return fail("level is unsolvable")
 
-    solved, sim_pushes = simulate(level, solution.moves)
+    try:
+        solved, sim_pushes = simulate(level, solution.moves)
+    except SimulationError as exc:
+        return fail(f"solver produced an illegal move string: {exc}")
     report.lines.append(
         f"  optimal  {len(solution.moves)} moves, {solution.optimal_pushes} pushes"
         + (f" (move-optimal line uses {solution.solution_pushes} pushes)"
@@ -567,6 +570,15 @@ def process(path: Path, args: argparse.Namespace) -> Report:
     report.lines.append("  replay   OK")
     if args.verbose:
         report.lines.append(f"  solution {solution.moves}")
+
+    stored = data.get("solution")
+    if isinstance(stored, str) and stored and stored != solution.moves:
+        try:
+            stored_ok, _ = simulate(level, stored)
+            note = f"{len(stored)} moves, " + ("solves the level" if stored_ok else "does not solve the level")
+        except SimulationError as exc:
+            note = str(exc)
+        report.lines.append(f"  stored   solution differs ({note})")
 
     computed = {
         "par_moves": len(solution.moves),

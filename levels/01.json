@@ -1,0 +1,20 @@
+{
+  "format": 1,
+  "id": "01",
+  "name": "初见",
+  "name_en": "First Light",
+  "theme": "dawn",
+  "seed": 1024,
+  "par_moves": 15,
+  "par_pushes": 5,
+  "solution": "RUUrrddLruulldD",
+  "map": [
+    " #####",
+    "##-.-##",
+    "#-----#",
+    "#-#$#-#",
+    "#-@$--#",
+    "##-.-##",
+    " #####"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "format": 1,
+  "id": "03",
+  "name": "掌灯",
+  "name_en": "Lamplighter",
+  "theme": "dusk",
+  "seed": 5150,
+  "par_moves": 45,
+  "par_pushes": 14,
+  "solution": "rrUruululldDDuuullDldRRlddrRuUUdrRurrdLLLrddL",
+  "map": [
+    "  #######",
+    "###--.--###",
+    "#--$#-#---#",
+    "#----*----#",
+    "#---#-#$--#",
+    "###--+--###",
+    "  #######"
+  ]
+}

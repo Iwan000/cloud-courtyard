@@ -1,0 +1,22 @@
+{
+  "format": 1,
+  "id": "05",
+  "name": "北辰",
+  "name_en": "Pole Star",
+  "theme": "night",
+  "seed": 9917,
+  "par_moves": 71,
+  "par_pushes": 24,
+  "solution": "ullLLLrruurrDullllDlDRRluurrdDrRllDDllUdrdRurrUrULLrddlluUUUruLdlldldRR",
+  "map": [
+    "  #####",
+    " ##.--##",
+    "##-----##",
+    "#-$#-#$.#",
+    "#---*---#",
+    "#.$#-#$@#",
+    "##-----##",
+    " ##--.##",
+    "  #####"
+  ]
+}

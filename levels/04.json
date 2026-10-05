@@ -1,0 +1,21 @@
+{
+  "format": 1,
+  "id": "04",
+  "name": "紫藤",
+  "name_en": "Wisteria Gallery",
+  "theme": "lavender",
+  "seed": 7203,
+  "par_moves": 60,
+  "par_pushes": 18,
+  "solution": "UUruLddlllddRdrUUdlluurRdrrUUluRddrrrddLdlUUdrruulLdlUUddlUU",
+  "map": [
+    "  ######",
+    " ##....##",
+    "##-#--#-##",
+    "#---$$---#",
+    "#-#-@--#-#",
+    "#-$-##-$-#",
+    "##------##",
+    " ########"
+  ]
+}
