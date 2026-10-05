@@ -75,10 +75,12 @@ func _ready() -> void:
 		await play_level(lvl)
 		if args.has("autoplay"):
 			var lurd: String = args["autoplay"]
-			if lurd == "solution":
+			if lurd.begins_with("solution"):
 				var solver := SokobanSolver.new()
 				solver.solve(lvl)
 				lurd = solver.solution
+				if args["autoplay"].contains(":"):
+					lurd = lurd.substr(0, int(args["autoplay"].get_slice(":", 1)))
 			controller.play_lurd(lurd)
 		if args.has("open"):
 			match args["open"]:
@@ -91,7 +93,10 @@ func _ready() -> void:
 	elif args.get("screen", "") == "select":
 		go_select(args.get("select", ""))
 	elif args.get("screen", "") == "editor":
-		go_editor(null)
+		var src: LevelData = null
+		if args.has("edit"):
+			src = LevelData.load_file("res://levels/%s.json" % args["edit"])
+		go_editor(src)
 		if args.get("open", "") == "topdown":
 			editor._toggle_view()
 	else:
@@ -117,7 +122,7 @@ func _clear_screen() -> void:
 
 ## 切换到某关的场景（只有建筑，没有箱子与角色），用于标题与选关背景。
 func _show_scenery(lvl: LevelData, offset: Vector2) -> void:
-	if world.monument and world.level != lvl:
+	if world.monument and (world.level != lvl or board.visible):
 		await director.play_outro(board.visible)
 	board.visible = false
 	world.load_level(lvl, true, offset)
@@ -189,11 +194,12 @@ func _preview(lvl: LevelData) -> void:
 	while _preview_pending != null:
 		var l := _preview_pending
 		_preview_pending = null
-		if world.level == l:
+		if world.level == l and not board.visible:
 			continue
 		var was_night := _is_night(world.theme)
 		if world.monument:
-			await director.play_outro(false)
+			await director.play_outro(board.visible)
+		board.visible = false
 		if screen != Screen.SELECT:
 			break
 		world.load_level(l, true, Vector2(0.2, 0.0), 1.22)

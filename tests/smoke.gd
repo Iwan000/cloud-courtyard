@@ -37,6 +37,11 @@ func _run() -> void:
 	_check(Game.builtin.size() >= 1, "built-in levels loaded")
 	for lvl in Game.builtin:
 		await _play_through(lvl)
+	# 结算 → 返回选关：棋盘应收起，建筑以选关取景重新升起
+	main.go_select()
+	await get_tree().create_timer(3.0).timeout
+	_check(main.screen == main.Screen.SELECT and not main.board.visible, "back to select hides board")
+	_check(main.screen_node is LevelSelect, "level select shown")
 	await _real_input_flow()
 	await _editor_flow()
 	print("[smoke] %s" % ("PASSED" if _failures.is_empty() else "FAILED: %s" % [_failures]))
