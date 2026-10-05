@@ -9,3 +9,6 @@ export_presets.cfg
 .DS_Store
 *.tmp
 __pycache__/
+
+# Local reference material (not part of the project)
+/参考图/
