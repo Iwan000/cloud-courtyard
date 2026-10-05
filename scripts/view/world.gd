@@ -157,8 +157,8 @@ func load_level(lvl: LevelData, hidden := false, frame_offset := Vector2.ZERO, f
 	set_build(0.0 if hidden else 1.0)
 	set_stairs(0.0 if hidden else 1.0)
 	set_water_flow(0.0 if hidden else 1.0)
-	for tr in builder.tree_nodes:
-		tr.scale = Vector3.ONE * (0.001 if hidden else 1.0)
+	for crown in builder.tree_nodes:
+		crown.scale = Vector3.ONE * (0.001 if hidden else 1.0)
 
 
 ## 编辑器用：只重建建筑与 AO（云、浮岛、取景保持不变），即时生效。
@@ -300,9 +300,9 @@ func _process(delta: float) -> void:
 		c.position = origin + camera.basis.x * off
 	if builder:
 		for i in builder.tree_nodes.size():
-			var tr := builder.tree_nodes[i]
-			tr.rotation.z = sin(_t * 1.1 + i * 2.0) * 0.035
-			tr.rotation.x = sin(_t * 0.8 + i) * 0.025
+			var crown := builder.tree_nodes[i]
+			crown.rotation.z = sin(_t * 1.1 + i * 2.0) * 0.035
+			crown.rotation.x = sin(_t * 0.8 + i) * 0.025
 
 
 # ---------------------------------------------------------------------------

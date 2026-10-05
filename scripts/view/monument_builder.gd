@@ -555,19 +555,19 @@ func _build_water(root: Node3D) -> void:
 func _build_stairs() -> void:
 	var best: Dictionary = {}
 	for run in _outline_runs():
-		var d: Vector2i = run["dir"]
-		if d != Vector2i.RIGHT and d != Vector2i.DOWN:
+		var run_dir: Vector2i = run["dir"]
+		if run_dir != Vector2i.RIGHT and run_dir != Vector2i.DOWN:
 			continue
-		var cells: Array = run["cells"]
-		if cells.size() < 4:
+		var run_cells: Array = run["cells"]
+		if run_cells.size() < 4:
 			continue
 		var blocked := false
-		for c: Vector2i in cells:
+		for c: Vector2i in run_cells:
 			if water_cells.has(c):
 				blocked = true
 		if blocked:
 			continue
-		if best.is_empty() or cells.size() > (best["cells"] as Array).size():
+		if best.is_empty() or run_cells.size() > (best["cells"] as Array).size():
 			best = run
 	if best.is_empty():
 		return

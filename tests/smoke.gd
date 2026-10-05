@@ -51,8 +51,8 @@ func _run() -> void:
 func _play_through(lvl: LevelData) -> void:
 	print("[smoke] level ", lvl.id, " ", lvl.name)
 	main.play_level(lvl)
-	var ready := await _wait_until(func(): return main.controller.accepting, 20.0)
-	_check(ready, "%s intro finished, input enabled" % lvl.id)
+	var intro_done := await _wait_until(func(): return main.controller.accepting, 20.0)
+	_check(intro_done, "%s intro finished, input enabled" % lvl.id)
 	var solver := SokobanSolver.new()
 	solver.solve(lvl)
 	_check(solver.status == SokobanSolver.Status.SOLVED, "%s solvable (%d moves)" % [lvl.id, solver.moves])

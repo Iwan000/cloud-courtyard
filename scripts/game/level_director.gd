@@ -31,10 +31,10 @@ func play_intro(with_board := true) -> void:
 	var wt := create_tween()
 	wt.tween_method(world.set_water_flow, 0.0, 1.0, 1.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	for i in world.builder.tree_nodes.size():
-		var tr := world.builder.tree_nodes[i]
-		var tt := tr.create_tween()
+		var crown := world.builder.tree_nodes[i]
+		var tt := crown.create_tween()
 		tt.tween_interval(i * 0.15)
-		tt.tween_property(tr, "scale", Vector3.ONE, 0.6).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tt.tween_property(crown, "scale", Vector3.ONE, 0.6).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	if with_board:
 		await board.play_intro()
 	else:
@@ -71,11 +71,11 @@ func play_complete() -> void:
 	board.cheer()
 	var lt := create_tween()
 	lt.tween_method(world.set_windows_lit, 0.0, 1.0, 1.4).set_trans(Tween.TRANS_SINE)
-	for tr in world.builder.tree_nodes:
-		var tt := tr.create_tween()
-		tt.tween_property(tr, "scale", Vector3.ONE * 1.2, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		tt.tween_property(tr, "scale", Vector3.ONE, 0.6).set_trans(Tween.TRANS_SINE)
-		board.fx.petals(tr.global_position + Vector3(0, 0.5, 0), Color(world.theme["foliage"][0]), 24)
+	for crown in world.builder.tree_nodes:
+		var tt := crown.create_tween()
+		tt.tween_property(crown, "scale", Vector3.ONE * 1.2, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tt.tween_property(crown, "scale", Vector3.ONE, 0.6).set_trans(Tween.TRANS_SINE)
+		board.fx.petals(crown.global_position + Vector3(0, 0.5, 0), Color(world.theme["foliage"][0]), 24)
 	for w in world.builder.water_nodes:
 		board.fx.sparkles(w.global_position + Vector3(0, 0.1, 0), Color(world.theme["water"]).lerp(Color.WHITE, 0.6), 8, 0.3, 0.8)
 	# 通往云海的台阶升起：庭院与外界重新相连

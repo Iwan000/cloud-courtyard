@@ -384,7 +384,7 @@ func _sep() -> Control:
 
 
 func _set_tool(t: int) -> void:
-	tool = t
+	tool = t as Tool
 	for b in _tool_buttons:
 		b.selected = b.tool_id == t
 
@@ -638,11 +638,11 @@ func _redo_action() -> void:
 
 func _restore(snapshot: LevelData) -> void:
 	var size_changed := snapshot.width != lvl.width or snapshot.height != lvl.height
-	var theme_changed := snapshot.theme != lvl.theme
+	var theme_switched := snapshot.theme != lvl.theme
 	lvl = snapshot.duplicate_level()
 	_name_edit.text = lvl.name
 	_dirty = true
-	_after_structural_change(size_changed or theme_changed)
+	_after_structural_change(size_changed or theme_switched)
 
 
 func _after_structural_change(full: bool) -> void:

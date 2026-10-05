@@ -52,11 +52,11 @@ func _register_input() -> void:
 			var code: int = keys[i]
 			if i == keys.size() - 1 and action != "hint":
 				var jb := InputEventJoypadButton.new()
-				jb.button_index = code
+				jb.button_index = code as JoyButton
 				InputMap.action_add_event(action, jb)
 			else:
 				var ev := InputEventKey.new()
-				ev.physical_keycode = code
+				ev.physical_keycode = code as Key
 				InputMap.action_add_event(action, ev)
 
 

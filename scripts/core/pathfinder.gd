@@ -23,11 +23,11 @@ static func find_path(state: SokobanState, goal: Vector2i) -> Array[int]:
 				queue.append(q)
 	if not came_from.has(goal):
 		return result
-	var p := goal
-	while p != state.player:
-		var dir: int = came_from[p]
+	var cur := goal
+	while cur != state.player:
+		var dir: int = came_from[cur]
 		result.push_front(dir)
-		p -= SokobanState.DIRS[dir]
+		cur -= SokobanState.DIRS[dir]
 	return result
 
 
