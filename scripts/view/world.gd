@@ -3,9 +3,11 @@ extends Node3D
 ## 3D 世界根节点：等轴正交相机、只投影的方向光、环境、2D 天空背景、后处理。
 ## 负责加载关卡的静态建筑；动态物体（箱子、角色）由 BoardView 管理。
 
-const PITCH_DEG := -35.264
-const YAW_DEG := 45.0
-const CAM_DISTANCE := 30.0
+## 视角：从正上方向前倾斜、略微偏转。网格的"上"基本就是屏幕的上，WASD 操作直观，
+## 同时仍能看到正面与右侧面，保留立体感。建筑生成器的防遮挡规则也使用这组角度。
+static var pitch_deg := -58.0
+static var yaw_deg := 20.0
+const CAM_DISTANCE := 22.0
 const SKY_SHADER := preload("res://shaders/sky_canvas.gdshader")
 const POST_SHADER := preload("res://shaders/post.gdshader")
 const CLOUD_SHADER := preload("res://shaders/cloud.gdshader")
@@ -20,10 +22,9 @@ var monument: Node3D
 var builder: MonumentBuilder
 var level: LevelData
 var theme: Dictionary
-var decor: Node3D                     ## 云、远景浮岛等氛围装饰
+var decor: Node3D                     ## 云海等氛围装饰
 var cloud_mat: ShaderMaterial
 var _clouds: Array[Node3D] = []
-var _islands: Array[Node3D] = []
 var _t := 0.0
 
 ## 相机目标与正交尺寸（可被动画驱动）
@@ -80,8 +81,8 @@ func _setup_camera() -> void:
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 	camera.size = cam_size
 	camera.near = 0.5
-	camera.far = 90.0
-	camera.rotation_degrees = Vector3(PITCH_DEG, YAW_DEG, 0.0)
+	camera.far = 70.0
+	camera.rotation_degrees = Vector3(pitch_deg, yaw_deg, 0.0)
 	add_child(camera)
 	_update_camera()
 
@@ -97,15 +98,17 @@ func _setup_light() -> void:
 	light.light_energy = 1.0
 	light.shadow_enabled = true
 	light.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
-	light.directional_shadow_max_distance = 60.0
+	light.directional_shadow_max_distance = 45.0
 	light.directional_shadow_fade_start = 1.0
-	light.shadow_blur = 1.6
-	light.shadow_bias = 0.03
-	light.shadow_normal_bias = 0.6
-	light.light_angular_distance = 2.0
+	# 硬朗清晰的投影（不用 PCSS 软化，只保留少量抗锯齿）
+	light.shadow_blur = 0.35
+	light.shadow_bias = 0.02
+	light.shadow_normal_bias = 0.35
+	light.light_angular_distance = 0.0
 	add_child(light)
 	# 光线方向：从右后上方照来，影子落向屏幕左下
-	light.look_at_from_position(Vector3.ZERO, Vector3(-0.42, -1.0, 0.62), Vector3.UP)
+	# 光线从左后上方照来，影子短而清晰地落向右前方
+	light.look_at_from_position(Vector3.ZERO, Vector3(0.45, -1.0, 0.3), Vector3.UP)
 
 
 func _setup_background() -> void:
@@ -250,15 +253,35 @@ func frame_canvas(w: int, h: int, margin := 1.06) -> void:
 	framed_size = cam_size
 
 
-## 入场进度：0 = 沉在云下，1 = 完全升起。
+## 入场进度：0 = 沉在云下，1 = 完全升起。静态网格在 shader 中位移，
+## 树、水、台阶等独立节点在这里按同一条曲线位移，保证整座建筑一起升起、一起沉下。
+var _build_t := 1.0
+var _stairs_raise := 1.0
+const BUILD_RISE := 7.0
+
+
 func set_build(t: float) -> void:
+	_build_t = t
 	if monument == null:
 		return
 	for c in monument.get_children():
 		if c is MeshInstance3D and c.name == "Static":
 			c.set_instance_shader_parameter("build_t", t)
+	for n in builder.anim_nodes:
+		n.position.y = n.get_meta("base_y") - _build_offset(t, n.get_meta("delay"))
 	for w in builder.water_nodes:
-		w.visible = t > 0.97
+		w.visible = t > 0.25
+	_apply_stairs()
+
+
+## 与 mv_surface.gdshader 中 vertex() 相同的升起曲线
+static func _build_offset(t: float, delay: float) -> float:
+	var lt := clampf((t - delay * 0.6) / 0.4, 0.0, 1.0)
+	const C1 := 1.40158
+	const C3 := C1 + 1.0
+	var x := lt - 1.0
+	var e := 1.0 + C3 * x * x * x + C1 * x * x
+	return (1.0 - e) * BUILD_RISE
 
 
 func set_water_flow(f: float) -> void:
@@ -266,15 +289,20 @@ func set_water_flow(f: float) -> void:
 		return
 	for w in builder.water_nodes:
 		w.set_instance_shader_parameter("flow", f)
-	Sfx.set_water(f * minf(builder.water_cells.size(), 2) * 0.5)
 
 
 ## 台阶升起进度：0 = 沉在云海深处，1 = 连接到台基的小门。
 func set_stairs(v: float) -> void:
+	_stairs_raise = v
+	_apply_stairs()
+
+
+func _apply_stairs() -> void:
 	if builder == null or builder.stairs_node == null:
 		return
-	builder.stairs_node.position.y = (1.0 - v) * -9.0
-	builder.stairs_node.visible = v > 0.01
+	var n := builder.stairs_node
+	n.position.y = (1.0 - _stairs_raise) * -9.0 - _build_offset(_build_t, n.get_meta("delay"))
+	n.visible = _stairs_raise > 0.01
 
 
 ## 窗户点亮（通关演出）
@@ -288,10 +316,6 @@ func set_windows_lit(v: float) -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
-	for i in _islands.size():
-		var isl := _islands[i]
-		var base_y: float = isl.get_meta("base_y")
-		isl.position.y = base_y + sin(_t * 0.35 + i * 1.7) * 0.25
 	for c in _clouds:
 		var speed: float = c.get_meta("speed")
 		var origin: Vector3 = c.get_meta("origin")
@@ -306,7 +330,7 @@ func _process(delta: float) -> void:
 
 
 # ---------------------------------------------------------------------------
-# 氛围：云海与远景浮岛
+# 氛围：云海
 # ---------------------------------------------------------------------------
 
 func _build_atmosphere() -> void:
@@ -316,17 +340,19 @@ func _build_atmosphere() -> void:
 	decor.name = "Atmosphere"
 	add_child(decor)
 	_clouds.clear()
-	_islands.clear()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = level.decor_seed * 31 + 7
-	_spawn_islands(rng)
 	_spawn_clouds(rng)
 
 
 ## 平台最靠近相机的角（地面高度）在屏幕上的纵坐标（相对相机目标）。
 func _near_corner_screen_y() -> float:
-	var p := Vector3(level.width - 0.5, -0.7, level.height - 0.5)
-	return (camera.basis.inverse() * (p - cam_target)).y
+	var inv := camera.basis.inverse()
+	var y := INF
+	for x in [-0.5, level.width - 0.5]:
+		var p := Vector3(x, -0.7, level.height - 0.5)
+		y = minf(y, (inv * (p - cam_target)).y)
+	return y
 
 
 ## 把屏幕空间坐标（以相机目标为原点，单位为世界尺度）和深度换算为世界坐标。
@@ -334,52 +360,18 @@ func _screen_to_world(sx: float, sy: float, depth: float) -> Vector3:
 	return cam_target + camera.basis.x * sx + camera.basis.y * sy - camera.basis.z * depth
 
 
-func _spawn_islands(rng: RandomNumberGenerator) -> void:
-	var half_w := cam_size * 0.5 * 16.0 / 9.0
-	var slots := [Vector2(-0.8, 0.42), Vector2(-0.96, -0.28), Vector2(0.9, -0.12), Vector2(0.62, -0.66)]
-	if _frame_offset.x > 0.1:
-		# 左侧有界面文字（标题、选关），远景只放在右侧
-		slots = [Vector2(0.93, 0.5), Vector2(0.97, -0.25), Vector2(0.6, -0.72)]
-	for i in slots.size():
-		var slot: Vector2 = slots[i]
-		var w := rng.randi_range(3, 5)
-		var h := rng.randi_range(3, 4)
-		var lvl := LevelData.create_empty(w, h)
-		lvl.theme = level.theme
-		lvl.decor_seed = rng.randi()
-		for y in h:
-			for x in w:
-				var edge := x == 0 or y == 0 or x == w - 1 or y == h - 1
-				lvl.set_cell(Vector2i(x, y), LevelData.Cell.WALL if edge else LevelData.Cell.FLOOR)
-		var b := MonumentBuilder.new(lvl, mats)
-		b.is_island = true
-		var node := b.build()
-		var island_scale := rng.randf_range(0.3, 0.4)
-		node.scale = Vector3.ONE * island_scale
-		var pos := _screen_to_world(slot.x * half_w, slot.y * cam_size * 0.5, rng.randf_range(30.0, 42.0))
-		pos -= Vector3(w * 0.5, 0, h * 0.5) * island_scale
-		node.position = pos
-		node.set_meta("base_y", pos.y)
-		var fade := 0.42 + rng.randf() * 0.1
-		# 淡化到其背后的天空颜色，而不是统一的白色
-		var sky_t := clampf(0.5 - slot.y * 0.5, 0.0, 1.0)
-		var sky_col: Color = Color(theme["sky_top"]).lerp(theme["sky_bottom"], pow(sky_t, 0.85))
-		for child in node.get_children():
-			if child is GeometryInstance3D:
-				child.set_instance_shader_parameter("fade", fade)
-				child.set_instance_shader_parameter("fade_color", sky_col)
-				child.set_instance_shader_parameter("ao_mask", 0.0)
-				child.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		decor.add_child(node)
-		_islands.append(node)
-
-
 func _spawn_clouds(rng: RandomNumberGenerator) -> void:
 	cloud_mat = ShaderMaterial.new()
 	cloud_mat.shader = CLOUD_SHADER
 	var fog: Color = theme["fog"]
-	cloud_mat.set_shader_parameter("color_top", fog.lerp(Color.WHITE, 0.55))
-	cloud_mat.set_shader_parameter("color_bottom", fog.lerp(Color(theme["deep"]), 0.18))
+	var night := Color(theme["sky_top"]).get_luminance() < 0.3
+	if night:
+		# 夜里的云贴近天空色、更淡，避免像一团烟
+		cloud_mat.set_shader_parameter("color_top", Color(theme["sky_bottom"]).lerp(Color.WHITE, 0.12))
+		cloud_mat.set_shader_parameter("color_bottom", Color(theme["sky_bottom"]).lerp(fog, 0.5))
+	else:
+		cloud_mat.set_shader_parameter("color_top", fog.lerp(Color.WHITE, 0.55))
+		cloud_mat.set_shader_parameter("color_bottom", fog.lerp(Color(theme["deep"]), 0.18))
 	var half_w := cam_size * 0.5 * 16.0 / 9.0
 	var count := 13
 	for i in count:
@@ -405,7 +397,8 @@ func _spawn_clouds(rng: RandomNumberGenerator) -> void:
 			sy = rng.randf_range(-0.6, 0.1) * cam_size * 0.5
 		var depth := rng.randf_range(-12.0, -6.0) if front else rng.randf_range(24.0, 40.0)
 		var origin := _screen_to_world(0.0, sy, depth)
-		mi.set_instance_shader_parameter("opacity", rng.randf_range(0.75, 0.95) if front else rng.randf_range(0.45, 0.7))
+		var op := rng.randf_range(0.75, 0.95) if front else rng.randf_range(0.45, 0.7)
+		mi.set_instance_shader_parameter("opacity", op * (0.55 if night else 1.0))
 		mi.set_meta("origin", origin)
 		mi.set_meta("span", half_w * 2.0 + w * 1.2)
 		mi.set_meta("phase", rng.randf() * (half_w * 2.0 + w))
@@ -427,8 +420,8 @@ func apply_theme(theme_id: String, animate := false) -> void:
 		mats.apply(theme)
 	var night := theme_id == "night"
 	var params := {
-		"sky_top": theme["sky_top"], "sky_bottom": theme["sky_bottom"], "sun_color": theme["sun"],
-		"stars": 1.0 if night else 0.0, "sun_size": 0.035 if night else 0.06, "cloud_amount": 0.25 if night else 0.6,
+		"sky_top": theme["sky_top"], "sky_bottom": theme["sky_bottom"],
+		"stars": 1.0 if night else 0.0,
 	}
 	if _sky_tween:
 		_sky_tween.kill()

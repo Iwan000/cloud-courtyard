@@ -1,5 +1,5 @@
 extends Node
-## 音效与音乐：对象池播放、五声音阶推箱旋律、环境音乐与水声。
+## 音效与音乐：对象池播放、五声音阶推箱旋律、环境音乐。
 ##
 ## 素材由 tools/gen_audio.py 程序合成（audio/ 目录）。缺失的素材会被安全忽略。
 
@@ -18,7 +18,6 @@ const BASE_DB := {
 	"editor_place": -6.0, "editor_erase": -10.0, "bell": -10.0,
 }
 const MUSIC_DB := -12.5
-const WATER_MAX_DB := -12.5
 
 ## 推箱旋律：在五声音阶上起伏，连续推箱即形成一段乐句
 const MELODY: PackedInt32Array = [0, 2, 4, 3, 5, 4, 2, 3, 5, 7, 6, 4, 5, 3, 2, 1]
@@ -27,7 +26,6 @@ var _streams := {}
 var _bells: Array[AudioStream] = []
 var _pool: Array[AudioStreamPlayer] = []
 var _music: AudioStreamPlayer
-var _water: AudioStreamPlayer
 var _melody_i := 0
 ## headless（无窗口，Dummy 音频驱动）下不播放：Dummy 驱动不混音，播放实例无法释放
 var _silent := false
@@ -55,16 +53,9 @@ func _ready() -> void:
 	_music.bus = "Music"
 	_music.volume_db = MUSIC_DB
 	add_child(_music)
-	_water = AudioStreamPlayer.new()
-	_water.bus = "SFX"
-	_water.volume_db = -80.0
-	add_child(_water)
 	var pad := _load("ambient_pad", true)
 	if pad:
 		_music.stream = pad
-	var water := _load("water_loop", true)
-	if water:
-		_water.stream = water
 
 
 func _ensure_bus(bus_name: String) -> void:
@@ -151,21 +142,6 @@ func start_music() -> void:
 		create_tween().tween_property(_music, "volume_db", MUSIC_DB, 3.0)
 
 
-## 水声音量随场景中的水量变化（0 = 无水）。
-func set_water(amount: float) -> void:
-	if _silent:
-		return
-	if _water.stream == null:
-		return
-	if amount <= 0.0:
-		create_tween().tween_property(_water, "volume_db", -60.0, 1.0)
-		return
-	if not _water.playing:
-		_water.volume_db = -60.0
-		_water.play()
-	create_tween().tween_property(_water, "volume_db", lerpf(WATER_MAX_DB - 12.0, WATER_MAX_DB, clampf(amount, 0.0, 1.0)), 1.5)
-
-
 func set_bus_volume(bus_name: String, linear: float) -> void:
 	var idx := AudioServer.get_bus_index(bus_name)
 	if idx >= 0:
@@ -175,7 +151,7 @@ func set_bus_volume(bus_name: String, linear: float) -> void:
 
 ## 停止所有播放并释放音频流（退出前调用，避免退出时报告资源泄漏）。
 func stop_all() -> void:
-	for p in _pool + [_music, _water]:
+	for p in _pool + [_music]:
 		p.stop()
 		p.stream = null
 	_streams.clear()

@@ -28,9 +28,6 @@ var theme_id := "dawn"
 var mats: ThemePalette.MaterialLib
 var rng := RandomNumberGenerator.new()
 
-## 远景浮岛模式：不生成水、树、台阶，不写 AO
-var is_island := false
-
 var kits := {}                 # 材质键 -> MeshKit
 var wall_h := {}               # Vector2i -> 墙高
 var top_h := {}                # Vector2i -> 该格最高点（AO 用）
@@ -42,7 +39,11 @@ var bounds := AABB()
 var water_nodes: Array[MeshInstance3D] = []
 var tree_nodes: Array[Node3D] = []
 var stairs_node: MeshInstance3D   ## 通向云海的台阶（通关时升起）
+## 独立于静态网格的装饰节点（树、水、台阶）：记录入场延迟与基准高度，
+## 由 World.set_build 按与 shader 相同的曲线一起升起 / 沉下
+var anim_nodes: Array[Node3D] = []
 var _stair_kit: MeshKit
+var _stairs_delay := 0.0
 
 const WATER_SHADER := preload("res://shaders/water.gdshader")
 
@@ -71,18 +72,16 @@ func build() -> Node3D:
 	_compute_center()
 	_compute_wall_heights()
 	_select_towers()
-	if not is_island:
-		_select_water()
+	_select_water()
 	_build_slab_and_floor()
 	_build_walls()
 	_build_cornice()
 	_build_arcades()
 	for p: Vector2i in towers:
 		_build_tower(p, towers[p])
-	if not is_island:
-		_build_stairs()
-		_build_water(root)
-		_build_trees(root)
+	_build_stairs()
+	_build_water(root)
+	_build_trees(root)
 
 	if _stair_kit and not _stair_kit.is_empty():
 		var sm := ArrayMesh.new()
@@ -91,6 +90,7 @@ func build() -> Node3D:
 		stairs_node.name = "Stairs"
 		stairs_node.mesh = sm
 		root.add_child(stairs_node)
+		_register_anim(stairs_node, _stairs_delay)
 	var mesh := ArrayMesh.new()
 	for key in kits:
 		(kits[key] as MeshKit).commit_to(mesh, mats.get_mat(key))
@@ -116,15 +116,49 @@ func _is_play(p: Vector2i) -> bool:
 
 
 ## 高为 h 的物体放在 cell 上，是否会遮挡可玩格。
-func _occludes_play(cell: Vector2i, h: float) -> bool:
-	# 俯角 35.26° 下，高 h 的物体会遮住其后方约 h / tan(35.26°) ≈ 1.414h 的地面；
-	# 对角线方向每格间距 1.414，计入格子自身尺寸后，第 k 格在 k < h + 0.7 时被（部分）遮挡。
-	var reach := maxi(1, int(ceil(h + 0.7)) - 1)
-	for k in range(1, reach + 1):
-		for off in [Vector2i(-k, -k), Vector2i(-k, -k + 1), Vector2i(-k + 1, -k)]:
-			if _is_play(cell + off):
-				return true
+## 判定方式：从可玩格中心、离地 EYE_H 高处（约等于石箱底部）朝相机方向发出视线，
+## 若视线在升到 h 之前进入物体所在的方格，则视为遮挡。相机角度取自 World。
+const EYE_H := 0.2
+
+
+## half 为物体占地的半宽（塔楼含屋顶外挑约 0.75）。每个候选格从中心与左右两侧各发一条视线。
+func _occludes_play(cell: Vector2i, h: float, half := 0.55) -> bool:
+	if h <= EYE_H:
+		return false
+	var pitch := deg_to_rad(absf(World.pitch_deg))
+	var yaw := deg_to_rad(World.yaw_deg)
+	# 水平面上朝向相机的方向（网格坐标：x = 列，y = 行）
+	var to_cam := Vector2(sin(yaw), cos(yaw))
+	var side := Vector2(to_cam.y, -to_cam.x) * 0.3
+	var reach := (h - EYE_H) / tan(pitch)
+	var span := int(ceil(reach + half)) + 1
+	for dy in range(-span, 1):
+		for dx in range(-span, span + 1):
+			var q := cell + Vector2i(dx, dy)
+			if q == cell or not _is_play(q):
+				continue
+			for o in [Vector2.ZERO, side, -side]:
+				if _ray_hits_square(Vector2(q) + o, to_cam, reach, Vector2(cell), half):
+					return true
 	return false
+
+
+## 从 origin 沿 dir 前进不超过 length，是否进入以 center 为中心、半宽为 half 的方格。
+static func _ray_hits_square(origin: Vector2, dir: Vector2, length: float, center: Vector2, half: float) -> bool:
+	var t0 := 0.0
+	var t1 := length
+	for axis in 2:
+		var o := origin[axis] - center[axis]
+		var d := dir[axis]
+		if absf(d) < 1e-6:
+			if absf(o) > half:
+				return false
+			continue
+		var a := (-half - o) / d
+		var b := (half - o) / d
+		t0 = maxf(t0, minf(a, b))
+		t1 = minf(t1, maxf(a, b))
+	return t0 <= t1
 
 
 func _compute_center() -> void:
@@ -345,7 +379,7 @@ func _select_towers() -> void:
 	# 离中心越远越优先（菱形的几个尖角）
 	candidates.sort_custom(func(a, b): return Vector2(a).distance_squared_to(_center) > Vector2(b).distance_squared_to(_center))
 	for p in candidates:
-		if towers.size() >= (4 if not is_island else 2):
+		if towers.size() >= 4:
 			break
 		var too_close := false
 		for t in towers:
@@ -354,8 +388,9 @@ func _select_towers() -> void:
 				break
 		if too_close:
 			continue
-		var h := rng.randf_range(2.3, 3.0) if not is_island else rng.randf_range(1.6, 2.6)
-		if _occludes_play(p, h):
+		var h := rng.randf_range(2.3, 3.0)
+		# 计入屋顶高度（约 1.1）与屋顶外挑
+		if _occludes_play(p, h + 1.1, 0.78):
 			continue
 		towers[p] = h
 
@@ -434,7 +469,8 @@ func _select_water() -> void:
 	for p: Vector2i in wall_h:
 		if towers.has(p):
 			continue
-		for d in [Vector2i.RIGHT, Vector2i.DOWN]:
+		# 只放在正面（+Z）：新视角下右侧面很窄，瀑布会被压扁
+		for d in [Vector2i.DOWN]:
 			if _solid(p + d):
 				continue
 			var t := Vector2i(absi(d.y), absi(d.x))
@@ -527,6 +563,7 @@ func _build_water(root: Node3D) -> void:
 		surf.material_override = surf_mat
 		root.add_child(surf)
 		water_nodes.append(surf)
+		_register_anim(surf, delay)
 		# 瀑布（含翻越墙沿的弧度）
 		var top := c + n * 0.56 + Vector3(0, y, 0)
 		var lip := c + n * 0.64 + Vector3(0, y - 0.1, 0)
@@ -545,6 +582,8 @@ func _build_water(root: Node3D) -> void:
 		root.add_child(fall)
 		water_nodes.append(lip_mi)
 		water_nodes.append(fall)
+		_register_anim(lip_mi, delay)
+		_register_anim(fall, delay)
 
 
 # ---------------------------------------------------------------------------
@@ -556,7 +595,7 @@ func _build_stairs() -> void:
 	var best: Dictionary = {}
 	for run in _outline_runs():
 		var run_dir: Vector2i = run["dir"]
-		if run_dir != Vector2i.RIGHT and run_dir != Vector2i.DOWN:
+		if run_dir != Vector2i.DOWN:
 			continue
 		var run_cells: Array = run["cells"]
 		if run_cells.size() < 4:
@@ -598,6 +637,7 @@ func _build_stairs() -> void:
 	poly.append(Vector2(u0 + 0.3, y_top - 0.62))
 	poly.append(Vector2(u0 - 0.38, y_top - 0.62))
 	# 台阶单独成网格：游戏中沉在云下，通关时升起
+	_stairs_delay = _delay_for(Vector2(first))
 	_stair_kit = MeshKit.new()
 	_stair_kit.uv2 = Vector2(0.0, 0.0)
 	_stair_kit.extrude(MeshKit._dedupe(poly), origin, t, Vector3.UP, n, 0.58)
@@ -624,7 +664,7 @@ func _build_trees(root: Node3D) -> void:
 		for wp: Vector2i in water_cells:
 			if absi(wp.x - p.x) + absi(wp.y - p.y) < 2:
 				near = true
-		if near or _occludes_play(p, WALL_HIGH + 1.4):
+		if near or _occludes_play(p, WALL_HIGH + 1.4, 0.6):
 			continue
 		cands.append(p)
 	var arr: Array = cands
@@ -679,7 +719,14 @@ func _build_tree(root: Node3D, p: Vector2i) -> void:
 	crown.add_child(mi)
 	root.add_child(crown)
 	tree_nodes.append(crown)
+	_register_anim(crown, delay)
 	top_h[p] = h + 0.3
+
+
+func _register_anim(n: Node3D, delay: float) -> void:
+	n.set_meta("delay", delay)
+	n.set_meta("base_y", n.position.y)
+	anim_nodes.append(n)
 
 
 # ---------------------------------------------------------------------------

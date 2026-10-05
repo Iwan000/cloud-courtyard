@@ -73,6 +73,10 @@ func _ready() -> void:
 			var kv := a.substr(2).split("=", true, 1)
 			cmd_args[kv[0]] = kv[1] if kv.size() > 1 else "true"
 	_shot_path = cmd_args.get("shot", "")
+	if cmd_args.has("pitch"):
+		World.pitch_deg = float(cmd_args["pitch"])
+	if cmd_args.has("yaw"):
+		World.yaw_deg = float(cmd_args["yaw"])
 	_shot_frames = int(cmd_args.get("shot-frames", "45"))
 	process_mode = Node.PROCESS_MODE_ALWAYS
 

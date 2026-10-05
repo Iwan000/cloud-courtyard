@@ -76,8 +76,11 @@ func _draw_icon(c: Vector2) -> void:
 			draw_arc(Vector2.ZERO, 10, 0, TAU, 24, Color(Color.WHITE, 0.8), 2.0, true)
 			draw_set_transform(Vector2.ZERO)
 		LevelEditor.Tool.PLAYER:
-			draw_colored_polygon(PackedVector2Array([c + Vector2(-8, 12), c + Vector2(8, 12), c + Vector2(3, -2), c + Vector2(-3, -2)]), colors[0])
-			draw_colored_polygon(PackedVector2Array([c + Vector2(-14, -2), c + Vector2(14, -2), c + Vector2(0, -12)]), colors[1])
+			# 棋子小兵剪影：底座 + 身体 + 领环 + 圆头
+			draw_rect(Rect2(c + Vector2(-9, 9), Vector2(18, 4)), colors[1])
+			draw_colored_polygon(PackedVector2Array([c + Vector2(-6, 9), c + Vector2(6, 9), c + Vector2(3, -2), c + Vector2(-3, -2)]), colors[0])
+			draw_rect(Rect2(c + Vector2(-5, -4), Vector2(10, 3)), colors[1])
+			draw_circle(c + Vector2(0, -9), 5.5, colors[0])
 		LevelEditor.Tool.ERASE:
 			draw_line(c + Vector2(-9, -9), c + Vector2(9, 9), Color(UiKit.ink, 0.8), 2.5, true)
 			draw_line(c + Vector2(9, -9), c + Vector2(-9, 9), Color(UiKit.ink, 0.8), 2.5, true)

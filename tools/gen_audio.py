@@ -20,13 +20,11 @@ Output conventions
 * One-shot SFX: 16-bit PCM WAV, 44.1 kHz, mono (``win`` / ``target_on`` are
   stereo), DC-free, short fades at both ends, peak-normalised to -1 dBFS.
   Playback level is set per sound in the engine (see ``Sound.target_db``).
-* Loops (``ambient_pad``, ``water_loop``): stereo, peak -3 dBFS, *periodic by
-  construction* -- frequency-domain noise, circular reverb, events wrapped
-  modulo the loop length, oscillators quantised to a whole number of cycles
-  per loop -- so the last sample flows straight into the first.
-  - ``water_loop.ogg``: Ogg Vorbis via ffmpeg's native ``vorbis`` encoder.  The
-    length is a multiple of 256 samples, which keeps the decoded stream
-    sample-exact; the noisy content hides any codec error at the seam.
+* Loop (``ambient_pad``): stereo, peak -3 dBFS, *periodic by construction* --
+  circular reverb, events wrapped modulo the loop length, oscillators
+  quantised to a whole number of cycles per loop -- so the last sample flows
+  straight into the first.  (An earlier noise-based waterfall loop was removed:
+  broadband noise read as wind / a broken microphone under the music.)
   - ``ambient_pad.wav``: 16-bit PCM at 22.05 kHz with a ``smpl`` loop chunk.
     The pad is so smooth and dark that the Vorbis encoder's error on the
     stream's last block becomes an audible click at the loop point.  Its
@@ -561,32 +559,6 @@ def build_ambient_pad(rng: np.random.Generator) -> np.ndarray:
     return 0.8 * pad + 0.6 * bells + 0.45 * circular_reverb(0.5 * pad + bells, ir)
 
 
-def build_water_loop(rng: np.random.Generator) -> np.ndarray:
-    n = loop_samples(10.0)
-
-    def wobble(rate_hz: float) -> np.ndarray:
-        """Smooth, periodic random control signal (unit RMS)."""
-        return shaped_noise(rng, n, band(hi=rate_hz, order=2))
-
-    out = np.zeros((n, 2))
-    shared_rumble = shaped_noise(rng, n, band(40, 220, tilt=1.0))
-    for ch in range(2):
-        rumble = 0.7 * shared_rumble + 0.7 * shaped_noise(rng, n, band(40, 220, tilt=1.0))
-        splash = shaped_noise(rng, n, band(350, 2200, tilt=0.5)) \
-            * np.clip(1.0 + 0.35 * wobble(4.0), 0.0, None)
-        hiss = shaped_noise(rng, n, band(2500, 9000)) * np.clip(1.0 + 0.6 * wobble(9.0), 0.0, None)
-        out[:, ch] = rumble + 0.5 * splash + 0.12 * hiss
-
-    # Droplets: tiny upward-chirping sine blips, wrapped around the loop point.
-    tt = time_axis(0.08)
-    for _ in range(28):
-        freq = rng.uniform(700, 1500) * (1.0 + 0.7 * (1.0 - decay(tt, 0.05)))
-        drop = sine_sweep(freq) * strike(tt, 0.001, 0.06)
-        mix_into(out, 0.35 * rng.uniform(0.3, 1.0) * pan(drop, rng.uniform(-0.8, 0.8)),
-                 int(rng.integers(n)), wrap=True)
-    return out
-
-
 # --------------------------------------------------------------------------
 # The sound table
 # --------------------------------------------------------------------------
@@ -623,8 +595,6 @@ SOUNDS: list[Sound] = [
     Sound("ambient_pad", build_ambient_pad,
           "64 s ambient bed: Cmaj9 - Am9 - Fmaj7(#11) - G6sus pad + sparse bells", -31.0,
           loop=True, rate=22_050),
-    Sound("water_loop", build_water_loop, "10 s gentle waterfall / stream", -33.0,
-          loop=True, codec="ogg"),
 ]
 
 

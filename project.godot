@@ -32,10 +32,9 @@ window/stretch/aspect="expand"
 
 [rendering]
 
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=4
 anti_aliasing/quality/msaa_3d=2
 anti_aliasing/quality/use_debanding=true
-lights_and_shadows/directional_shadow/size=4096
-lights_and_shadows/directional_shadow/soft_shadow_filter_quality=4
 environment/defaults/default_clear_color=Color(0.95, 0.9, 0.89, 1)
 
 [shader_globals]

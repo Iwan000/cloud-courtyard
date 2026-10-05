@@ -47,10 +47,18 @@ func _draw() -> void:
 			draw_line(tip, tip - dir.rotated(0.6) * 6.0, a, w, true)
 			draw_line(tip, tip - dir.rotated(-0.6) * 6.0, a, w, true)
 		"restart":
-			draw_arc(center, r, -PI * 0.35, PI * 1.45, 32, a, w, true)
-			var tip := center + Vector2(cos(-PI * 0.35), sin(-PI * 0.35)) * r
-			draw_line(tip, tip + Vector2(-6, -1), a, w, true)
-			draw_line(tip, tip + Vector2(0, 6), a, w, true)
+			# 留出右上缺口的四分之三圆弧，箭头沿终点切线
+			var pts := PackedVector2Array()
+			var a0 := deg_to_rad(60.0)
+			var a1 := deg_to_rad(330.0)
+			for i in range(19):
+				var th := lerpf(a0, a1, i / 18.0)
+				pts.append(center + Vector2(cos(th), sin(th)) * r)
+			draw_polyline(pts, a, w, true)
+			var tip := pts[pts.size() - 1]
+			var dir := (tip - pts[pts.size() - 2]).normalized()
+			draw_line(tip, tip - dir.rotated(0.6) * 6.0, a, w, true)
+			draw_line(tip, tip - dir.rotated(-0.6) * 6.0, a, w, true)
 		"menu":
 			for k in [-6, 0, 6]:
 				draw_line(center + Vector2(-9, k), center + Vector2(9, k), a, w, true)

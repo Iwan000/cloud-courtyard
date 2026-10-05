@@ -82,6 +82,8 @@ func _ready() -> void:
 				if args["autoplay"].contains(":"):
 					lurd = lurd.substr(0, int(args["autoplay"].get_slice(":", 1)))
 			controller.play_lurd(lurd)
+		if args.has("zoom"):
+			world.cam_size = float(args["zoom"])
 		if args.has("open"):
 			match args["open"]:
 				"pause":
@@ -164,7 +166,7 @@ func go_select(select_id := "") -> void:
 	if not testing_from_editor:
 		_close_editor()
 	controller.stop()
-	director.reset_camera(0.01)
+	director.stop_camera()
 	screen = Screen.SELECT
 	if select_id == "" and current_level:
 		select_id = current_level.id
@@ -299,7 +301,7 @@ func _show_hint(res: Dictionary) -> void:
 				p += SokobanState.DIRS[d]
 			var box_cell: Vector2i = p + SokobanState.DIRS[res["push_dir"]]
 			board.show_hint(state.box_at(box_cell), res["push_dir"], walk)
-			var dir_names := ["右上", "右下", "左下", "左上"]
+			var dir_names := ["上", "右", "下", "左"]
 			var how := "沿虚线走过去，" if not walk.is_empty() else ""
 			hud.show_objective("提示：%s把发光的石箱向%s推" % [how, dir_names[res["push_dir"]]], 2.5)
 		SokobanSolver.Status.UNSOLVABLE:
@@ -332,6 +334,10 @@ func _on_solved() -> void:
 			go_select(lvl.id))
 	screen_node = panel
 	panel.focus_default()
+	# 开发用：--then=NN 结算后自动进入指定关卡（用于录制关卡切换）
+	if Game.cmd_args.has("then"):
+		await get_tree().create_timer(2.5).timeout
+		play_level(LevelData.load_file("res://levels/%s.json" % Game.cmd_args["then"]))
 
 
 # ---------------------------------------------------------------------------
@@ -386,7 +392,7 @@ func go_editor(lvl: LevelData) -> void:
 	_clear_screen()
 	controller.stop()
 	hints.cancel()
-	director.reset_camera(0.01)
+	director.stop_camera()
 	screen = Screen.EDITOR
 	board.visible = false
 	if editor and is_instance_valid(editor) and testing_from_editor:

@@ -6,7 +6,12 @@ extends Node3D
 signal step_finished(result: SokobanState.MoveResult)
 
 const WALK_TIME := 0.16
-const PUSH_TIME := 0.23
+const PUSH_TIME := 0.36
+## 推箱分三段：前倾蓄力（头碰到箱子）→ 顶着箱子前进 → 松开回正
+const PUSH_LEAN_END := 0.24
+const PUSH_MOVE_END := 0.84
+## 前倾到位时身体向前探出的距离（使头恰好贴住箱面）
+const PUSH_LUNGE := 0.04
 const UNDO_TIME := 0.13
 const BUMP_TIME := 0.2
 
@@ -25,7 +30,6 @@ var _anim := {}
 var _target_glow := {}   # Vector2i -> 当前发光值
 var _box_glow: Array[float] = []
 var _target_yaw := PI
-var _push_hold := 0.0
 var _cursor: MeshInstance3D
 var _dots: Array[MeshInstance3D] = []
 var _dot_mat: StandardMaterial3D
@@ -131,9 +135,7 @@ func play(r: SokobanState.MoveResult) -> void:
 		"walk":
 			Sfx.play("step", randf_range(0.9, 1.15))
 		"push":
-			_push_hold = 0.3
-			Sfx.play("push", randf_range(0.92, 1.05))
-			Sfx.play_push_note()
+			pass  # 推动音效在头碰到箱子的那一刻播放（见 _advance）
 		"undo":
 			Sfx.play("undo")
 		"bump":
@@ -154,13 +156,13 @@ func _process(delta: float) -> void:
 	character.rotation.y = lerp_angle(character.rotation.y, _target_yaw, 1.0 - exp(-delta * 22.0))
 	var moving := false
 	if not _anim.is_empty():
-		moving = _anim["kind"] != "bump"
+		moving = _anim["kind"] == "walk" or _anim["kind"] == "undo"
 		_advance(delta)
 	character.walk_amount = move_toward(character.walk_amount, 1.0 if moving else 0.0, delta * 8.0)
 	if moving:
 		character.walk_phase += delta * PI / (WALK_TIME / speed)
-	_push_hold = maxf(_push_hold - delta, 0.0)
-	character.push_amount = move_toward(character.push_amount, 1.0 if _push_hold > 0.0 else 0.0, delta * 7.0)
+	if _anim.is_empty() or (_anim["kind"] != "push" and _anim["kind"] != "bump"):
+		character.lean = move_toward(character.lean, 0.0, delta * 6.0)
 	_animate_glow(delta)
 
 
@@ -179,23 +181,43 @@ func _advance(delta: float) -> void:
 				_anim["fx_done"] = true
 				fx.footstep(to, Color(theme["fog"]).lerp(Color.WHITE, 0.3))
 		"push":
-			var e := _ease_push(t)
-			character.position = from.lerp(to, e)
+			var dir3 := _dir3(r.dir)
 			var box := box_nodes[r.box_id]
-			box.position = cell_pos(r.box_from).lerp(cell_pos(r.box_to), e)
-			if t >= 0.35 and not _anim["fx_done"]:
-				_anim["fx_done"] = true
-				var dir3 := _dir3(r.dir)
-				fx.dust(cell_pos(r.box_from) + dir3 * 0.45, dir3, Color(theme["fog"]).lerp(Color(theme["floor"][1]), 0.5))
+			var box_from := cell_pos(r.box_from)
+			if t < PUSH_LEAN_END:
+				# 前倾蓄力：身体前探，头贴上箱面
+				var k := _ease_walk(t / PUSH_LEAN_END)
+				character.lean = k
+				character.position = from + dir3 * PUSH_LUNGE * k
+				box.position = box_from
+			elif t < PUSH_MOVE_END:
+				# 顶着箱子一起前进
+				if not _anim["fx_done"]:
+					_anim["fx_done"] = true
+					Sfx.play("push", randf_range(0.92, 1.05))
+					Sfx.play_push_note()
+					fx.dust(box_from + dir3 * 0.45, dir3, Color(theme["fog"]).lerp(Color(theme["floor"][1]), 0.5))
+				var k := _ease_push((t - PUSH_LEAN_END) / (PUSH_MOVE_END - PUSH_LEAN_END))
+				character.lean = 1.0
+				box.position = box_from.lerp(cell_pos(r.box_to), k)
+				character.position = from.lerp(to, k) + dir3 * PUSH_LUNGE
+			else:
+				# 松开回正
+				var k := _ease_walk((t - PUSH_MOVE_END) / (1.0 - PUSH_MOVE_END))
+				character.lean = 1.0 - k
+				box.position = cell_pos(r.box_to)
+				character.position = to + dir3 * PUSH_LUNGE * (1.0 - k)
 		"undo":
 			var e := _ease_walk(t)
 			character.position = from.lerp(to, e)
 			if r.box_id >= 0:
 				box_nodes[r.box_id].position = cell_pos(r.box_from).lerp(cell_pos(r.box_to), e)
 		"bump":
+			# 前倾去顶，被挡住后弹回
 			var dir3 := _dir3(r.dir)
 			var out := sin(PI * minf(t * 1.6, 1.0)) * (1.0 - t * 0.3)
-			character.position = from + dir3 * 0.12 * out
+			character.position = from + dir3 * 0.1 * out
+			character.lean = out * (0.8 if r.blocked == "box" else 0.35)
 			if r.blocked == "box" and r.box_id >= 0:
 				var shake := sin(t * PI * 5.0) * (1.0 - t) * 0.03
 				box_nodes[r.box_id].position = cell_pos(r.box_from) + dir3 * shake
@@ -239,7 +261,7 @@ static func _ease_walk(t: float) -> float:
 
 
 static func _ease_push(t: float) -> float:
-	# 起步稍慢（蓄力），中段加速，末端柔和停住
+	# 起步稍慢（石箱沉重），中段加速，末端柔和停住
 	return 1.0 - pow(1.0 - pow(t, 1.35), 2.2)
 
 
@@ -443,13 +465,13 @@ func flash_target(t: Vector2i) -> void:
 
 
 func cheer() -> void:
+	character.cheer = 0.0
 	var tw := character.create_tween()
-	tw.tween_property(character, "cheer", 1.0, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.parallel().tween_property(character, "position:y", 0.28, 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_property(character, "position:y", 0.0, 0.25).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tw.tween_interval(0.9)
-	tw.tween_property(character, "cheer", 0.0, 0.5)
-
+	tw.set_parallel()
+	tw.tween_property(character, "cheer", 1.0, 0.7).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(character, "position:y", 0.32, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.chain().tween_property(character, "position:y", 0.0, 0.3).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	tw.chain().tween_callback(func(): character.cheer = 0.0)
 
 
 # ---------------------------------------------------------------------------

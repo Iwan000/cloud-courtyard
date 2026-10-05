@@ -17,7 +17,7 @@ const MATERIAL_KEYS: PackedStringArray = [
 static var THEMES := {
 	"dawn": {
 		"title": "晨曦", "title_en": "Dawn",
-		"sky_top": Color("9fd6e6"), "sky_bottom": Color("f6e7e3"), "sun": Color("fff6ea"),
+		"sky_top": Color("9fd6e6"), "sky_bottom": Color("f6e7e3"),
 		"fog": Color("f1e4ea"), "deep": Color("b7a6dc"), "shadow": Color("b9a5dd"),
 		"target": Color("8fcab3"), "target_glow": Color("d9fff0"), "water": Color("8fd9e4"),
 		"floor": ["f7eadf", "ecc9bd", "dfb0a6"],
@@ -42,7 +42,7 @@ static var THEMES := {
 	},
 	"garden": {
 		"title": "碧水", "title_en": "Garden",
-		"sky_top": Color("b9e8e3"), "sky_bottom": Color("fff1dc"), "sun": Color("fffbe8"),
+		"sky_top": Color("b9e8e3"), "sky_bottom": Color("fff1dc"),
 		"fog": Color("e6f2e6"), "deep": Color("7fb8b6"), "shadow": Color("98c2bf"),
 		"target": Color("f2a48e"), "target_glow": Color("fff0e0"), "water": Color("7fd8e3"),
 		"floor": ["f5ead2", "e4d2b3", "d1bb98"],
@@ -67,7 +67,7 @@ static var THEMES := {
 	},
 	"dusk": {
 		"title": "暮霞", "title_en": "Dusk",
-		"sky_top": Color("f4a9a0"), "sky_bottom": Color("fde3c4"), "sun": Color("fff1d6"),
+		"sky_top": Color("f4a9a0"), "sky_bottom": Color("fde3c4"),
 		"fog": Color("f8dccd"), "deep": Color("9a6aa8"), "shadow": Color("cf96ae"),
 		"target": Color("6fc6c3"), "target_glow": Color("e8fffd"), "water": Color("8fd3da"),
 		"floor": ["fce8c9", "efcfa6", "dfb688"],
@@ -92,7 +92,7 @@ static var THEMES := {
 	},
 	"lavender": {
 		"title": "紫境", "title_en": "Lavender",
-		"sky_top": Color("c3cff6"), "sky_bottom": Color("f6dbeb"), "sun": Color("fff3f8"),
+		"sky_top": Color("c3cff6"), "sky_bottom": Color("f6dbeb"),
 		"fog": Color("ecdcef"), "deep": Color("8e86d6"), "shadow": Color("bba8e6"),
 		"target": Color("e8707f"), "target_glow": Color("ffe3e8"), "water": Color("9fd6f0"),
 		"floor": ["f8e6dc", "edcabd", "dfb0a5"],
@@ -117,7 +117,7 @@ static var THEMES := {
 	},
 	"night": {
 		"title": "星夜", "title_en": "Starry Night",
-		"sky_top": Color("10133a"), "sky_bottom": Color("3d2f7c"), "sun": Color("f4f0ff"),
+		"sky_top": Color("10133a"), "sky_bottom": Color("3d2f7c"),
 		"fog": Color("2c2a6a"), "deep": Color("1b1d4d"), "shadow": Color("3f3a86"),
 		"target": Color("ffd27a"), "target_glow": Color("fff1c8"), "water": Color("6fa8e8"),
 		"floor": ["8e88d9", "6f69c0", "5853a8"],
