@@ -1,0 +1,11 @@
+# Godot 4
+.godot/
+/android/
+*.translation
+export_presets.cfg
+/build/
+
+# OS / editor
+.DS_Store
+*.tmp
+__pycache__/
