@@ -29,10 +29,13 @@ var _pool: Array[AudioStreamPlayer] = []
 var _music: AudioStreamPlayer
 var _water: AudioStreamPlayer
 var _melody_i := 0
+## headless（无窗口，Dummy 音频驱动）下不播放：Dummy 驱动不混音，播放实例无法释放
+var _silent := false
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_silent = DisplayServer.get_name() == "headless"
 	_ensure_bus("Music")
 	_ensure_bus("SFX")
 	for n in SFX_NAMES:
@@ -99,6 +102,8 @@ func _player() -> AudioStreamPlayer:
 
 
 func play(sfx_name: String, pitch := 1.0, db_offset := 0.0) -> void:
+	if _silent:
+		return
 	var s: AudioStream = _streams.get(sfx_name)
 	if s == null:
 		return
@@ -110,6 +115,8 @@ func play(sfx_name: String, pitch := 1.0, db_offset := 0.0) -> void:
 
 
 func play_bell(index: int, db_offset := 0.0) -> void:
+	if _silent:
+		return
 	if _bells.is_empty():
 		return
 	var p := _player()
@@ -136,6 +143,8 @@ func play_arpeggio(count: int, interval := 0.12, start := 3) -> void:
 
 
 func start_music() -> void:
+	if _silent:
+		return
 	if _music.stream and not _music.playing:
 		_music.volume_db = -40.0
 		_music.play()
@@ -144,6 +153,8 @@ func start_music() -> void:
 
 ## 水声音量随场景中的水量变化（0 = 无水）。
 func set_water(amount: float) -> void:
+	if _silent:
+		return
 	if _water.stream == null:
 		return
 	if amount <= 0.0:
