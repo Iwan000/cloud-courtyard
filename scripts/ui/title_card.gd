@@ -15,13 +15,13 @@ func show_card(numeral: String, title: String, sub: String) -> void:
 		var n := UiKit.label(numeral, 30, 500, Color(UiKit.ink, 0.6), true)
 		n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(n)
-	var t := UiKit.label(title, 60, 600)
+	var t := UiKit.glow(UiKit.label(title, 60, 600), 0.6, 18)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(t)
 	var line := UiKit.hline(80, 0.4)
 	line.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.add_child(line)
-	var s := UiKit.label(sub, 26, 400, Color(UiKit.ink, 0.7), true, true)
+	var s := UiKit.glow(UiKit.label(sub, 26, 400, Color(UiKit.ink, 0.7), true, true), 0.5, 12)
 	s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(s)
 	modulate.a = 0.0

@@ -65,11 +65,20 @@ func _ready() -> void:
 	Sfx.start_music()
 
 	var args := Game.cmd_args
+	if args.has("smoke"):
+		Game.cmd_args["unlock-all"] = "true"
+		add_child(load("res://tests/smoke.gd").new())
+		return
 	if args.has("level"):
 		var lvl := LevelData.load_file("res://levels/%s.json" % args["level"])
 		await play_level(lvl)
 		if args.has("autoplay"):
-			controller.play_lurd(lvl.solution if args["autoplay"] == "solution" else args["autoplay"])
+			var lurd: String = args["autoplay"]
+			if lurd == "solution":
+				var solver := SokobanSolver.new()
+				solver.solve(lvl)
+				lurd = solver.solution
+			controller.play_lurd(lurd)
 	elif args.get("screen", "") == "select":
 		go_select()
 	elif args.get("screen", "") == "editor":

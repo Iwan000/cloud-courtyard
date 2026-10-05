@@ -2,6 +2,8 @@ class_name CompletePanel
 extends Control
 ## 通关结算：庭院已苏醒。显示步数、推动、最佳与参考，以及三枚花瓣评价。
 
+const SHADE_SHADER := preload("res://shaders/ui_bottom_shade.gdshader")
+
 signal next_pressed
 signal replay_pressed
 signal select_pressed
@@ -12,13 +14,25 @@ var _first: MvButton
 func build(lvl: LevelData, moves: int, pushes: int, best: int, new_record: bool, has_next: bool, in_editor_test := false) -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# 底部柔和渐变底，衬托文字
+	var shade := ColorRect.new()
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sm := ShaderMaterial.new()
+	sm.shader = SHADE_SHADER
+	var night := UiKit.ink.get_luminance() > 0.6
+	sm.set_shader_parameter("tint", Color(0.08, 0.07, 0.22) if night else Color(1, 1, 1))
+	shade.material = sm
+	add_child(shade)
+	shade.modulate.a = 0.0
+	shade.create_tween().tween_property(shade, "modulate:a", 1.0, 1.0)
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 4)
 	add_child(box)
 	UiKit.pin(box, 0.5, 1.0, 0, -64)
 
-	var title := UiKit.label("庭院已苏醒", 50, 600)
+	var title := UiKit.glow(UiKit.label("庭院已苏醒", 50, 600))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 	var en := UiKit.label("The courtyard awakens", 26, 400, Color(UiKit.ink, 0.7), true, true)

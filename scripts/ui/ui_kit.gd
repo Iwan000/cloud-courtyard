@@ -209,3 +209,13 @@ static func pin(c: Control, ax: float, ay: float, ox := 0.0, oy := 0.0) -> void:
 	c.offset_bottom = oy
 	c.grow_horizontal = Control.GROW_DIRECTION_END if ax < 0.25 else (Control.GROW_DIRECTION_BEGIN if ax > 0.75 else Control.GROW_DIRECTION_BOTH)
 	c.grow_vertical = Control.GROW_DIRECTION_END if ay < 0.25 else (Control.GROW_DIRECTION_BEGIN if ay > 0.75 else Control.GROW_DIRECTION_BOTH)
+
+
+## 给文字加一圈柔和的背景色光晕，保证在 3D 场景上可读。
+static func glow(l: Label, alpha := 0.55, size := 14) -> Label:
+	var night := ink.get_luminance() > 0.6
+	l.add_theme_color_override("font_shadow_color", Color(0.1, 0.08, 0.25, alpha) if night else Color(1, 1, 1, alpha))
+	l.add_theme_constant_override("shadow_outline_size", size)
+	l.add_theme_constant_override("shadow_offset_x", 0)
+	l.add_theme_constant_override("shadow_offset_y", 0)
+	return l

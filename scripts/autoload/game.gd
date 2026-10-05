@@ -231,7 +231,9 @@ func _load_settings() -> void:
 # 工具
 # ---------------------------------------------------------------------------
 
-static func _save_json(path: String, data: Variant) -> void:
+func _save_json(path: String, data: Variant) -> void:
+	if cmd_args.has("smoke"):
+		return  # 自动化测试不写入玩家存档
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(data, "  "))

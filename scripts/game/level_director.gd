@@ -72,7 +72,8 @@ func play_complete() -> void:
 		_cam_tween.kill()
 	_cam_tween = create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_cam_tween.tween_property(world, "cam_size", world.framed_size * 1.14, 3.6)
-	_cam_tween.tween_property(world, "cam_target", world.framed_target + Vector3(0, 0.35, 0), 3.6)
+	# 建筑上移，为下方的结算文字让出空间
+	_cam_tween.tween_property(world, "cam_target", world.framed_target - world.camera.basis.y * world.framed_size * 0.13, 3.6)
 	await get_tree().create_timer(1.8).timeout
 
 

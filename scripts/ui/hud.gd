@@ -62,7 +62,7 @@ func build(lvl: LevelData, index_text: String) -> void:
 	add_child(_controls)
 	UiKit.pin(_controls, 0.0, 1.0, 56, -52)
 
-	_objective = UiKit.label("", 22, 500, UiKit.ink)
+	_objective = UiKit.glow(UiKit.label("", 22, 500, UiKit.ink), 0.6, 14)
 	_objective.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_objective.modulate.a = 0.0
 	add_child(_objective)
