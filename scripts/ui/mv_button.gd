@@ -1,16 +1,18 @@
 class_name MvButton
 extends Button
-## 纯文字按钮：悬停/聚焦时下划线从中间展开，文字轻微右移；带音效。
+## 纯文字按钮：悬停/聚焦时下划线从中间展开，左侧出现小菱形；带音效。
+## 可选前缀列（如关卡序号）：前缀在固定宽度的列中单独绘制，正文统一从列宽之后开始，
+## 这样不同宽度的序号（I / III / IV）后面的名字也能左对齐。
 
-var sub_text := ""
-var _hover := 0.0
 var font_size := 26
+var prefix := ""
+var prefix_width := 0.0
+var _hover := 0.0
 
 
-func setup(text_value: String, px := 26, sub := "") -> void:
+func setup(text_value: String, px := 26) -> void:
 	text = text_value
 	font_size = px
-	sub_text = sub
 	alignment = HORIZONTAL_ALIGNMENT_LEFT
 	add_theme_font_override("font", UiKit.font(500))
 	add_theme_font_size_override("font_size", px)
@@ -20,6 +22,17 @@ func setup(text_value: String, px := 26, sub := "") -> void:
 	mouse_entered.connect(_on_enter)
 	focus_entered.connect(_on_enter)
 	pressed.connect(func(): Sfx.play("ui_click"))
+
+
+## 设置前缀列：正文向右让出 width 像素，前缀画在这一列里。
+func set_prefix(value: String, width: float) -> void:
+	prefix = value
+	prefix_width = width
+	var pad := StyleBoxEmpty.new()
+	pad.content_margin_left = width
+	for st in ["normal", "hover", "pressed", "focus", "disabled", "hover_pressed"]:
+		add_theme_stylebox_override(st, pad)
+	queue_redraw()
 
 
 func _on_enter() -> void:
@@ -35,10 +48,15 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
+	var font := get_theme_font("font")
+	if prefix != "":
+		# 与 Button 正文相同的垂直居中方式，保证基线对齐
+		var baseline := (size.y - font.get_height(font_size)) * 0.5 + font.get_ascent(font_size)
+		draw_string(font, Vector2(0, baseline), prefix, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size,
+			get_theme_color("font_disabled_color" if disabled else "font_color"))
 	if _hover <= 0.001:
 		return
-	var font := get_theme_font("font")
-	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	var w := prefix_width + font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 	var e := 1.0 - pow(1.0 - _hover, 3.0)
 	var y := size.y * 0.5 + font_size * 0.62
 	var c := Color(UiKit.ink, 0.75 * e)

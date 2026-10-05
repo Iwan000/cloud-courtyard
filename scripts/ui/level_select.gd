@@ -79,12 +79,13 @@ func build(select_id := "") -> void:
 
 func _add_entry(parent: Control, lvl: LevelData, numeral: String, locked: bool, is_custom := false) -> void:
 	var b := MvButton.new()
-	var title := "%s   %s" % [numeral, lvl.name]
-	b.setup(title, 30 if not is_custom else 24)
+	var px := 30 if not is_custom else 24
+	b.setup("· · ·" if locked else lvl.name, px)
+	# 序号单独成列（按所有序号的最大宽度对齐），名字统一左对齐
+	b.set_prefix(numeral, _numeral_column_width(px))
 	b.custom_minimum_size.x = 210 if not is_custom else 240
 	if locked:
-		b.text = "%s   · · ·" % numeral
-		b.modulate.a = 0.45
+		b.self_modulate.a = 0.45   # 用 self_modulate，避免被入场淡入动画覆盖
 	var idx := _entries.size()
 	b.pressed.connect(func():
 		if _selected == idx:
@@ -96,6 +97,16 @@ func _add_entry(parent: Control, lvl: LevelData, numeral: String, locked: bool, 
 			_select(idx))
 	parent.add_child(b)
 	_entries.append({"lvl": lvl, "button": b, "locked": locked, "custom": is_custom})
+
+
+## 序号列宽：所有内置关卡罗马数字中最宽者 + 间距。
+func _numeral_column_width(px: int) -> float:
+	var font := UiKit.font(500)
+	var w := 0.0
+	for i in Game.builtin.size():
+		w = maxf(w, font.get_string_size(UiKit.roman(i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, px).x)
+	w = maxf(w, font.get_string_size("◇", HORIZONTAL_ALIGNMENT_LEFT, -1, px).x)
+	return w + px * 0.8
 
 
 func _select(i: int) -> void:

@@ -139,9 +139,9 @@ static func label(text: String, size := 22, weight := 500, color := Color(0, 0, 
 	return l
 
 
-static func text_button(text: String, size := 26, sub := "") -> MvButton:
+static func text_button(text: String, size := 26) -> MvButton:
 	var b := MvButton.new()
-	b.setup(text, size, sub)
+	b.setup(text, size)
 	return b
 
 
