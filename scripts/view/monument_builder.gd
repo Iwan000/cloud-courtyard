@@ -55,7 +55,7 @@ func _init(lvl: LevelData, material_lib: ThemePalette.MaterialLib) -> void:
 	theme_id = lvl.theme
 	theme = ThemePalette.get_theme(lvl.theme)
 	mats = material_lib
-	rng.seed = lvl.seed
+	rng.seed = lvl.decor_seed
 
 
 func kit(key: String) -> MeshKit:

@@ -73,9 +73,9 @@ func open(w: World, d: LevelDirector, source: LevelData) -> void:
 	if source:
 		lvl = source.duplicate_level()
 		# 给画布四周留出编辑空间
-		var pad := Vector2i(mini(2, MAX_SIZE - lvl.width) / 2 * 2, mini(2, MAX_SIZE - lvl.height) / 2 * 2)
+		var pad := Vector2i(2 if lvl.width <= MAX_SIZE - 2 else 0, 2 if lvl.height <= MAX_SIZE - 2 else 0)
 		if pad != Vector2i.ZERO:
-			lvl = lvl.resized(lvl.width + pad.x, lvl.height + pad.y, pad / 2)
+			lvl = lvl.resized(lvl.width + pad.x, lvl.height + pad.y, Vector2i(pad.x >> 1, pad.y >> 1))
 	else:
 		lvl = _starter_level()
 	_saved_hash = lvl.content_hash() if source else 0
@@ -99,7 +99,7 @@ func _starter_level() -> LevelData:
 	l.name = "新的庭院"
 	l.name_en = "A New Courtyard"
 	l.theme = "dawn"
-	l.seed = randi() % 100000
+	l.decor_seed = randi() % 100000
 	return l
 
 
@@ -368,8 +368,8 @@ func _panel(vpad := 22) -> PanelContainer:
 	return p
 
 
-func _small_button(text: String, cb: Callable, size := 20) -> MvButton:
-	var b := UiKit.text_button(text, size)
+func _small_button(text: String, cb: Callable, px := 20) -> MvButton:
+	var b := UiKit.text_button(text, px)
 	b.custom_minimum_size.y = 40
 	b.pressed.connect(cb)
 	return b
@@ -703,7 +703,7 @@ func _clear() -> void:
 	lvl.name = keep.name
 	lvl.name_en = keep.name_en
 	lvl.theme = keep.theme
-	lvl.seed = keep.seed
+	lvl.decor_seed = keep.decor_seed
 	lvl.id = keep.id
 	_dirty = true
 	Sfx.play("editor_erase", 0.8)
@@ -725,11 +725,11 @@ func _set_theme(th_id: String) -> void:
 
 func _reroll() -> void:
 	_push_history()
-	lvl.seed = randi() % 1000000
+	lvl.decor_seed = randi() % 1000000
 	_dirty = true
 	Sfx.play("editor_place", 1.3)
 	_rebuild()
-	toast("建筑形态已更换（种子 %d）" % lvl.seed)
+	toast("建筑形态已更换（种子 %d）" % lvl.decor_seed)
 
 
 func _toggle_view() -> void:
@@ -753,11 +753,11 @@ func _import_xsb() -> void:
 	imported.name = lvl.name
 	imported.name_en = lvl.name_en
 	imported.theme = lvl.theme
-	imported.seed = lvl.seed
+	imported.decor_seed = lvl.decor_seed
 	imported.id = lvl.id
 	var w := clampi(imported.width + 2, MIN_SIZE, MAX_SIZE)
 	var h := clampi(imported.height + 2, MIN_SIZE, MAX_SIZE)
-	lvl = imported.resized(w, h, Vector2i((w - imported.width) / 2, (h - imported.height) / 2))
+	lvl = imported.resized(w, h, Vector2i((w - imported.width) >> 1, (h - imported.height) >> 1))
 	_dirty = true
 	_after_structural_change(true)
 	toast("已从剪贴板导入 XSB 地图")

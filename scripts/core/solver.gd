@@ -88,10 +88,6 @@ func _ci(p: Vector2i) -> int:
 	return (p.y + 1) * _w + (p.x + 1)
 
 
-func _cv(i: int) -> Vector2i:
-	return Vector2i(i % _w - 1, i / _w - 1)
-
-
 func _prepare(level: LevelData) -> void:
 	_w = level.width + 2
 	_h = level.height + 2
@@ -310,8 +306,8 @@ func _reconstruct(node: int, parents: PackedInt32Array, push_info: PackedInt32Ar
 	var player := start_player
 	var lurd := ""
 	for info in chain:
-		var box := info / 4
-		var d := info % 4
+		var box := info >> 2
+		var d := info & 3
 		var stand := box - _offs[d]
 		lurd += _walk_path(player, stand)
 		lurd += SokobanState.DIR_CHARS[d].to_upper()

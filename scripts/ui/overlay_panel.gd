@@ -61,8 +61,8 @@ func add_title(text: String, en := "") -> void:
 	content.add_child(sp)
 
 
-func add_button(text: String, cb: Callable, size := 26) -> MvButton:
-	var b := UiKit.text_button(text, size)
+func add_button(text: String, cb: Callable, px := 26) -> MvButton:
+	var b := UiKit.text_button(text, px)
 	b.pressed.connect(cb)
 	content.add_child(b)
 	return b

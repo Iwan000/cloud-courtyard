@@ -44,6 +44,15 @@ func _ready() -> void:
 	_setup_light()
 	_setup_background()
 	_setup_post()
+	get_viewport().size_changed.connect(_on_viewport_resized)
+
+
+## 窗口尺寸变化时重新取景（相机演出中的偏移会被复位到标准取景）。
+func _on_viewport_resized() -> void:
+	if canvas_dims != Vector2i.ZERO:
+		frame_canvas(canvas_dims.x, canvas_dims.y)
+	elif level:
+		frame_level(_frame_margin, _frame_offset)
 
 
 func _setup_environment() -> void:
@@ -309,7 +318,7 @@ func _build_atmosphere() -> void:
 	_clouds.clear()
 	_islands.clear()
 	var rng := RandomNumberGenerator.new()
-	rng.seed = level.seed * 31 + 7
+	rng.seed = level.decor_seed * 31 + 7
 	_spawn_islands(rng)
 	_spawn_clouds(rng)
 
@@ -337,7 +346,7 @@ func _spawn_islands(rng: RandomNumberGenerator) -> void:
 		var h := rng.randi_range(3, 4)
 		var lvl := LevelData.create_empty(w, h)
 		lvl.theme = level.theme
-		lvl.seed = rng.randi()
+		lvl.decor_seed = rng.randi()
 		for y in h:
 			for x in w:
 				var edge := x == 0 or y == 0 or x == w - 1 or y == h - 1
@@ -345,10 +354,10 @@ func _spawn_islands(rng: RandomNumberGenerator) -> void:
 		var b := MonumentBuilder.new(lvl, mats)
 		b.is_island = true
 		var node := b.build()
-		var scale := rng.randf_range(0.3, 0.4)
-		node.scale = Vector3.ONE * scale
+		var island_scale := rng.randf_range(0.3, 0.4)
+		node.scale = Vector3.ONE * island_scale
 		var pos := _screen_to_world(slot.x * half_w, slot.y * cam_size * 0.5, rng.randf_range(30.0, 42.0))
-		pos -= Vector3(w * 0.5, 0, h * 0.5) * scale
+		pos -= Vector3(w * 0.5, 0, h * 0.5) * island_scale
 		node.position = pos
 		node.set_meta("base_y", pos.y)
 		var fade := 0.42 + rng.randf() * 0.1
@@ -436,6 +445,7 @@ func apply_theme(theme_id: String, animate := false) -> void:
 
 ## 当前关卡的标准取景（用于演出结束后复位）
 var _frame_offset := Vector2.ZERO
+var _frame_margin := 1.06
 var framed_target := Vector3.ZERO
 var framed_size := 12.0
 
@@ -445,6 +455,7 @@ func frame_level(margin := 1.06, offset := Vector2.ZERO) -> void:
 	if level == null:
 		return
 	_frame_offset = offset
+	_frame_margin = margin
 	var top := 1.5
 	for p in builder.top_h:
 		top = maxf(top, builder.top_h[p] + 0.9)

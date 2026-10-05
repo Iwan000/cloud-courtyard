@@ -17,7 +17,8 @@ var id: String = ""
 var name: String = "未命名"
 var name_en: String = "Untitled"
 var theme: String = "dawn"
-var seed: int = 0
+## 程序化建筑的随机种子（JSON 字段名为 "seed"）
+var decor_seed: int = 0
 var par_moves: int = -1
 var par_pushes: int = -1
 var solution: String = ""
@@ -123,7 +124,7 @@ func duplicate_level() -> LevelData:
 	lvl.name = name
 	lvl.name_en = name_en
 	lvl.theme = theme
-	lvl.seed = seed
+	lvl.decor_seed = decor_seed
 	lvl.par_moves = par_moves
 	lvl.par_pushes = par_pushes
 	lvl.solution = solution
@@ -152,7 +153,7 @@ func resized(new_w: int, new_h: int, offset: Vector2i = Vector2i.ZERO) -> LevelD
 	lvl.name = name
 	lvl.name_en = name_en
 	lvl.theme = theme
-	lvl.seed = seed
+	lvl.decor_seed = decor_seed
 	for y in height:
 		for x in width:
 			var np := Vector2i(x, y) + offset
@@ -325,7 +326,7 @@ func to_dict() -> Dictionary:
 		"name": name,
 		"name_en": name_en,
 		"theme": theme,
-		"seed": seed,
+		"seed": decor_seed,
 		"par_moves": par_moves,
 		"par_pushes": par_pushes,
 		"solution": solution,
@@ -343,7 +344,7 @@ static func from_dict(d: Dictionary) -> LevelData:
 	lvl.name_en = str(d.get("name_en", ""))
 	var th := str(d.get("theme", "dawn"))
 	lvl.theme = th if THEMES.has(th) else "dawn"
-	lvl.seed = int(d.get("seed", 0))
+	lvl.decor_seed = int(d.get("seed", 0))
 	lvl.par_moves = int(d.get("par_moves", -1))
 	lvl.par_pushes = int(d.get("par_pushes", -1))
 	lvl.solution = str(d.get("solution", ""))

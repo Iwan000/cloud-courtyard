@@ -4,20 +4,19 @@ extends Button
 
 var sub_text := ""
 var _hover := 0.0
-var _sub_label: Label
 var font_size := 26
 
 
-func setup(text_value: String, size := 26, sub := "") -> void:
+func setup(text_value: String, px := 26, sub := "") -> void:
 	text = text_value
-	font_size = size
+	font_size = px
 	sub_text = sub
 	alignment = HORIZONTAL_ALIGNMENT_LEFT
 	add_theme_font_override("font", UiKit.font(500))
-	add_theme_font_size_override("font_size", size)
+	add_theme_font_size_override("font_size", px)
 	focus_mode = Control.FOCUS_ALL
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	custom_minimum_size.y = size * 1.9
+	custom_minimum_size.y = px * 1.9
 	mouse_entered.connect(_on_enter)
 	focus_entered.connect(_on_enter)
 	pressed.connect(func(): Sfx.play("ui_click"))

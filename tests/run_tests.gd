@@ -77,12 +77,12 @@ func test_json_roundtrip() -> void:
 	l.name = "测试"
 	l.name_en = "Test"
 	l.theme = "dusk"
-	l.seed = 42
+	l.decor_seed = 42
 	var parsed: Variant = JSON.parse_string(l.to_json_string())
 	check(typeof(parsed) == TYPE_DICTIONARY, "json parses")
 	var back := LevelData.from_dict(parsed)
 	check(back.to_rows() == l.to_rows(), "map roundtrip")
-	check(back.name == "测试" and back.theme == "dusk" and back.seed == 42, "meta roundtrip")
+	check(back.name == "测试" and back.theme == "dusk" and back.decor_seed == 42, "meta roundtrip")
 
 
 func test_move_and_push() -> void:

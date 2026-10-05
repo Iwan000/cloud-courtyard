@@ -37,6 +37,7 @@ func _run() -> void:
 	_check(Game.builtin.size() >= 1, "built-in levels loaded")
 	for lvl in Game.builtin:
 		await _play_through(lvl)
+	await _real_input_flow()
 	await _editor_flow()
 	print("[smoke] %s" % ("PASSED" if _failures.is_empty() else "FAILED: %s" % [_failures]))
 	get_tree().quit(0 if _failures.is_empty() else 1)
@@ -95,3 +96,77 @@ func _editor_flow() -> void:
 	await get_tree().process_frame
 	_check(main.editor == ed and ed.visible, "editor resumed with state after test play")
 	_check(ed.lvl.theme == "night" and ed._history.size() > 0, "editor history kept")
+
+
+## 通过真实输入事件驱动（键盘、鼠标点击、编辑器点击），覆盖 _unhandled_input、拾取与 UI 遮挡。
+func _real_input_flow() -> void:
+	print("[smoke] real input events")
+	main.play_level(Game.builtin[0])
+	await _wait_until(func(): return main.controller.accepting, 20.0)
+	var st: SokobanState = main.state
+	# 键盘：找一个可以直接走过去的方向，模拟按下与松开
+	var keys := [KEY_W, KEY_D, KEY_S, KEY_A]
+	var dir := -1
+	for d in 4:
+		if st.is_walkable(st.player + SokobanState.DIRS[d]):
+			dir = d
+			break
+	var start := st.player
+	_key(keys[dir], true)
+	await get_tree().process_frame
+	_key(keys[dir], false)
+	await _wait_until(func(): return not main.board.is_busy(), 3.0)
+	_check(st.player == start + SokobanState.DIRS[dir] and st.moves == 1, "keyboard move via InputMap")
+	# 撤销键
+	_key(KEY_Z, true)
+	await get_tree().process_frame
+	_key(KEY_Z, false)
+	await _wait_until(func(): return not main.board.is_busy(), 3.0)
+	_check(st.player == start and st.moves == 0, "keyboard undo")
+	# 鼠标：点击一个两步以上可达的地板格，旅人应自动走到那里
+	var goal := Vector2i(-1, -1)
+	var reach := Pathfinder.reachable(st)
+	for c in reach:
+		if Pathfinder.find_path(st, c).size() >= 2:
+			goal = c
+			break
+	var screen: Vector2 = main.world.camera.unproject_position(BoardView.cell_pos(goal))
+	_click(screen)
+	await _wait_until(func(): return st.player == goal and not main.board.is_busy(), 6.0)
+	_check(st.player == goal, "mouse click walks to %s" % goal)
+	# 编辑器：用鼠标在画布上点一下（墙工具），格子应变为墙
+	main.go_editor(null)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var ed: LevelEditor = main.editor
+	ed._set_tool(LevelEditor.Tool.WALL)
+	var cell := Vector2i(0, 0)
+	for y in ed.lvl.height:
+		for x in ed.lvl.width:
+			if ed.lvl.get_cell(Vector2i(x, y)) == LevelData.Cell.VOID and ed._pick(main.world.camera.unproject_position(Vector3(x, 0, y))) == Vector2i(x, y):
+				cell = Vector2i(x, y)
+	_click(main.world.camera.unproject_position(Vector3(cell.x, 0, cell.y)))
+	await get_tree().process_frame
+	_check(ed.lvl.is_wall(cell), "editor mouse paint at %s" % cell)
+	main._close_editor()
+	main.screen = main.Screen.NONE
+
+
+func _key(code: Key, pressed: bool) -> void:
+	var ev := InputEventKey.new()
+	ev.physical_keycode = code
+	ev.keycode = code
+	ev.pressed = pressed
+	Input.parse_input_event(ev)
+
+
+func _click(pos: Vector2) -> void:
+	for pressed in [true, false]:
+		var ev := InputEventMouseButton.new()
+		ev.button_index = MOUSE_BUTTON_LEFT
+		ev.pressed = pressed
+		ev.position = pos
+		ev.global_position = pos
+		# 以视口坐标直接投递（headless 下窗口尺寸为 0，窗口→视口的拉伸变换不可用）
+		get_viewport().push_input(ev, true)
+		await get_tree().process_frame

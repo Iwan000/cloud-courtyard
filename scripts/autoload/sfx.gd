@@ -29,7 +29,6 @@ var _pool: Array[AudioStreamPlayer] = []
 var _music: AudioStreamPlayer
 var _water: AudioStreamPlayer
 var _melody_i := 0
-var _water_target := -80.0
 
 
 func _ready() -> void:
@@ -161,3 +160,12 @@ func set_bus_volume(bus_name: String, linear: float) -> void:
 	if idx >= 0:
 		AudioServer.set_bus_volume_db(idx, linear_to_db(maxf(linear, 0.0001)))
 		AudioServer.set_bus_mute(idx, linear <= 0.001)
+
+
+## 退出时停止所有播放并释放音频流，避免退出时报告资源泄漏。
+func _exit_tree() -> void:
+	for p in _pool + [_music, _water]:
+		p.stop()
+		p.stream = null
+	_streams.clear()
+	_bells.clear()
