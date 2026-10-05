@@ -397,7 +397,7 @@ cloud-courtyard/
 | `win.wav` | 上行琶音 + pad 渐强 |
 | `ui_hover.wav` / `ui_click.wav` | 界面轻响 |
 | `editor_place.wav` / `editor_erase.wav` | 编辑器放置 / 擦除 |
-| `ambient_pad.ogg` | 环境音乐：缓慢变化的和弦 pad + 稀疏钟声，无缝循环 |
+| `ambient_pad.wav` | 环境音乐：缓慢变化的和弦 pad + 稀疏钟声，无缝循环（22.05 kHz WAV + smpl 循环块；原生 Vorbis 编码器在循环点会产生咔哒声，故不用 Ogg） |
 | `water_loop.ogg` | 水声循环，音量随屏幕上的水量变化 |
 
 ---

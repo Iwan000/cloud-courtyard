@@ -12,7 +12,7 @@ dest_files=["res://.godot/imported/water_loop.ogg-684f84f12501da87bc61930fc23b35
 
 [params]
 
-loop=false
+loop=true
 loop_offset=0
 bpm=0
 beat_count=0

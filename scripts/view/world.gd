@@ -106,7 +106,7 @@ func _setup_background() -> void:
 	add_child(layer)
 	var rect := ColorRect.new()
 	rect.name = "Sky"
-	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	sky_mat = ShaderMaterial.new()
 	sky_mat.shader = SKY_SHADER
@@ -121,7 +121,7 @@ func _setup_post() -> void:
 	add_child(layer)
 	var rect := ColorRect.new()
 	rect.name = "Post"
-	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	post_mat = ShaderMaterial.new()
 	post_mat.shader = POST_SHADER
@@ -133,17 +133,50 @@ func _setup_post() -> void:
 # 关卡
 # ---------------------------------------------------------------------------
 
-func load_level(lvl: LevelData) -> void:
+## 加载关卡建筑。hidden=true 时建筑停在云下（build_t = 0），等待入场动画。
+func load_level(lvl: LevelData, hidden := false, frame_offset := Vector2.ZERO) -> void:
 	level = lvl
-	apply_theme(lvl.theme)
+	apply_theme(lvl.theme, hidden)
 	if monument:
 		monument.queue_free()
 	builder = MonumentBuilder.new(lvl, mats)
 	monument = builder.build()
 	add_child(monument)
 	builder.build_ao_map()
-	frame_level()
+	frame_level(1.06, frame_offset)
 	_build_atmosphere()
+	set_build(0.0 if hidden else 1.0)
+	set_water_flow(0.0 if hidden else 1.0)
+	for tr in builder.tree_nodes:
+		tr.scale = Vector3.ONE * (0.001 if hidden else 1.0)
+
+
+## 入场进度：0 = 沉在云下，1 = 完全升起。
+func set_build(t: float) -> void:
+	if monument == null:
+		return
+	for c in monument.get_children():
+		if c is MeshInstance3D and c.name == "Static":
+			c.set_instance_shader_parameter("build_t", t)
+	for w in builder.water_nodes:
+		w.visible = t > 0.97
+
+
+func set_water_flow(f: float) -> void:
+	if builder == null:
+		return
+	for w in builder.water_nodes:
+		w.set_instance_shader_parameter("flow", f)
+	Sfx.set_water(f * minf(builder.water_cells.size(), 2) * 0.5)
+
+
+## 窗户点亮（通关演出）
+func set_windows_lit(v: float) -> void:
+	if monument == null:
+		return
+	for c in monument.get_children():
+		if c is MeshInstance3D and c.name == "Static":
+			c.set_instance_shader_parameter("glow", v)
 
 
 func _process(delta: float) -> void:
@@ -271,25 +304,42 @@ func _spawn_clouds(rng: RandomNumberGenerator) -> void:
 		_clouds.append(mi)
 
 
-func apply_theme(theme_id: String) -> void:
+var _sky_tween: Tween
+
+
+## 切换主题。animate=true 时天空颜色平滑过渡（建筑此时沉在云下，材质可直接切换）。
+func apply_theme(theme_id: String, animate := false) -> void:
 	theme = ThemePalette.get_theme(theme_id)
 	ThemePalette.apply_globals(theme)
 	if mats == null:
 		mats = ThemePalette.MaterialLib.new(theme)
 	else:
 		mats.apply(theme)
-	sky_mat.set_shader_parameter("sky_top", theme["sky_top"])
-	sky_mat.set_shader_parameter("sky_bottom", theme["sky_bottom"])
-	sky_mat.set_shader_parameter("sun_color", theme["sun"])
 	var night := theme_id == "night"
-	sky_mat.set_shader_parameter("stars", 1.0 if night else 0.0)
-	sky_mat.set_shader_parameter("sun_size", 0.035 if night else 0.06)
-	sky_mat.set_shader_parameter("cloud_amount", 0.25 if night else 0.6)
+	var params := {
+		"sky_top": theme["sky_top"], "sky_bottom": theme["sky_bottom"], "sun_color": theme["sun"],
+		"stars": 1.0 if night else 0.0, "sun_size": 0.035 if night else 0.06, "cloud_amount": 0.25 if night else 0.6,
+	}
+	if _sky_tween:
+		_sky_tween.kill()
+	if animate and sky_mat.get_shader_parameter("sky_top") != null:
+		_sky_tween = create_tween().set_parallel().set_trans(Tween.TRANS_SINE)
+		for k in params:
+			var from: Variant = sky_mat.get_shader_parameter(k)
+			_sky_tween.tween_method(func(v): sky_mat.set_shader_parameter(k, v), from, params[k], 1.4)
+	else:
+		for k in params:
+			sky_mat.set_shader_parameter(k, params[k])
 	post_mat.set_shader_parameter("vignette_color", Color(theme["deep"]).darkened(0.2))
 
 
-## 让相机框住整个平台（含塔楼），留出边距。
-func frame_level(margin := 1.06) -> void:
+## 当前关卡的标准取景（用于演出结束后复位）
+var framed_target := Vector3.ZERO
+var framed_size := 12.0
+
+
+## 让相机框住整个平台（含塔楼），留出边距。offset 为屏幕比例偏移（例如 (0.2, 0) 让建筑偏右）。
+func frame_level(margin := 1.06, offset := Vector2.ZERO) -> void:
 	if level == null:
 		return
 	var top := 1.5
@@ -312,5 +362,11 @@ func frame_level(margin := 1.06) -> void:
 	var extent := mx - mn
 	var vp := get_viewport().get_visible_rect().size
 	var aspect := vp.x / maxf(vp.y, 1.0)
-	cam_size = maxf(extent.y, extent.x / aspect) * margin
-	cam_target = camera.basis * Vector3(center2.x, center2.y, 0.0)
+	var size := maxf(extent.y, extent.x / aspect) * margin
+	if offset != Vector2.ZERO:
+		size *= 1.0 + absf(offset.x) * 0.9
+	cam_size = size
+	var shift := Vector2(-offset.x * size * aspect, offset.y * size)
+	cam_target = camera.basis * Vector3(center2.x + shift.x, center2.y + shift.y, 0.0)
+	framed_target = cam_target
+	framed_size = cam_size

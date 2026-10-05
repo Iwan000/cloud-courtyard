@@ -20,13 +20,18 @@ Output conventions
 * One-shot SFX: 16-bit PCM WAV, 44.1 kHz, mono (``win`` / ``target_on`` are
   stereo), DC-free, short fades at both ends, peak-normalised to -1 dBFS.
   Playback level is set per sound in the engine (see ``Sound.target_db``).
-* Loops (``ambient_pad``, ``water_loop``): stereo Ogg Vorbis, peak -3 dBFS.
-  They are *periodic by construction* -- frequency-domain noise, circular
-  reverb, events wrapped modulo the loop length, oscillators quantised to a
-  whole number of cycles per loop -- so the last sample flows into the first.
-  Lengths are multiples of 256 samples, which keeps the decoded Ogg
-  sample-exact, and each loop starts at a zero crossing, which hides the
-  encoder's edge error.  Encoding uses ffmpeg's native ``vorbis`` encoder.
+* Loops (``ambient_pad``, ``water_loop``): stereo, peak -3 dBFS, *periodic by
+  construction* -- frequency-domain noise, circular reverb, events wrapped
+  modulo the loop length, oscillators quantised to a whole number of cycles
+  per loop -- so the last sample flows straight into the first.
+  - ``water_loop.ogg``: Ogg Vorbis via ffmpeg's native ``vorbis`` encoder.  The
+    length is a multiple of 256 samples, which keeps the decoded stream
+    sample-exact; the noisy content hides any codec error at the seam.
+  - ``ambient_pad.wav``: 16-bit PCM at 22.05 kHz with a ``smpl`` loop chunk.
+    The pad is so smooth and dark that the Vorbis encoder's error on the
+    stream's last block becomes an audible click at the loop point.  Its
+    spectrum is already 65-80 dB below its peak band above 5 kHz, so 22.05 kHz
+    loses nothing audible and halves the size of 44.1 kHz PCM.
 * All randomness is seeded from each sound's name, so runs are bit-identical.
 
 After writing, the script re-reads every file and prints a verification
@@ -39,8 +44,10 @@ import argparse
 import functools
 import os
 import shutil
+import struct
 import subprocess
 import sys
+import warnings
 import zlib
 from dataclasses import dataclass
 from pathlib import Path
@@ -56,8 +63,9 @@ FFMPEG = os.environ.get("FFMPEG") or shutil.which("ffmpeg") or "/opt/homebrew/bi
 
 SFX_PEAK_DB = -1.0
 LOOP_PEAK_DB = -3.0
-OGG_QUALITY = 8      # ffmpeg native Vorbis "-q:a" (VBR; the dark pad needs few bits)
+OGG_QUALITY = 8      # ffmpeg native Vorbis "-q:a" (VBR)
 VORBIS_BLOCK = 256   # loop lengths are multiples of this so the decoded Ogg is sample-exact
+LOOP_POSTROLL = 64   # frames of loop-start copied after a WAV loop's end (see write_wav)
 
 TAU = 2.0 * np.pi
 
@@ -592,6 +600,8 @@ class Sound:
     # The report turns this into a suggested AudioStreamPlayer.volume_db.
     target_db: float
     loop: bool = False
+    codec: str = "wav"           # "wav" (16-bit PCM) or "ogg" (Vorbis)
+    rate: int = SR               # output sample rate (synthesis always runs at SR)
 
 
 SOUNDS: list[Sound] = [
@@ -611,8 +621,10 @@ SOUNDS: list[Sound] = [
     Sound("editor_place", build_editor_place, "editor: wooden 'tok' when placing", -30.0),
     Sound("editor_erase", build_editor_erase, "editor: soft 'puff' when erasing", -29.0),
     Sound("ambient_pad", build_ambient_pad,
-          "64 s ambient bed: Cmaj9 - Am9 - Fmaj7(#11) - G6sus pad + sparse bells", -31.0, loop=True),
-    Sound("water_loop", build_water_loop, "10 s gentle waterfall / stream", -33.0, loop=True),
+          "64 s ambient bed: Cmaj9 - Am9 - Fmaj7(#11) - G6sus pad + sparse bells", -31.0,
+          loop=True, rate=22_050),
+    Sound("water_loop", build_water_loop, "10 s gentle waterfall / stream", -33.0,
+          loop=True, codec="ogg"),
 ]
 
 
@@ -635,35 +647,48 @@ def finish_sfx(x: np.ndarray) -> np.ndarray:
     return normalize(x, SFX_PEAK_DB)
 
 
-def rotate_to_zero_crossing(x: np.ndarray, search: float = 2.0) -> np.ndarray:
-    """Rotate a loop so it starts where every channel is (nearly) zero.
-
-    The Vorbis encoder reproduces the very first and last sample of a stream
-    with an error roughly proportional to their value -- a one-sample click at
-    the loop point.  Starting the loop at a joint zero crossing (searched in
-    the first `search` seconds) makes that error negligible.  Rotating a
-    periodic signal keeps it periodic.
-    """
-    k = np.arange(1, samples(search))
-    cost = np.abs(x[k]).sum(axis=1) + np.abs(x[k - 1]).sum(axis=1)
-    return np.roll(x, -int(k[np.argmin(cost)]), axis=0)
-
-
-def finish_loop(x: np.ndarray) -> np.ndarray:
+def finish_loop(x: np.ndarray, rate: int) -> np.ndarray:
     # No fades and no causal filtering here: either would break the seam.
-    x = normalize(x - x.mean(axis=0), LOOP_PEAK_DB)
-    return rotate_to_zero_crossing(x)
+    x = x - x.mean(axis=0)
+    if rate != SR:
+        # FFT resampling treats the signal as periodic, so the loop stays seamless.
+        x = signal.resample(x, len(x) * rate // SR, axis=0)
+    return normalize(x, LOOP_PEAK_DB)
 
 
-def write_wav(path: Path, x: np.ndarray) -> None:
-    wavfile.write(path, SR, np.clip(np.round(x * 32767), -32768, 32767).astype("<i2"))
+def write_wav(path: Path, x: np.ndarray, rate: int = SR, loop: bool = False) -> None:
+    """16-bit PCM WAV.
+
+    With `loop`, a RIFF 'smpl' chunk marks frames [0, len(x)) as one forward
+    loop -- Godot's WAV importer picks it up ("Detect From WAV") and uses the
+    stored end as an exclusive bound.  A few frames of post-roll (a copy of the
+    loop's start) follow, so interpolation that reads past the loop end still
+    sees the true continuation.  A reader that takes the end as inclusive, as
+    the RIFF spec says, merely repeats one sample.
+    """
+    frames = len(x)
+    if loop:
+        x = np.concatenate([x, x[:LOOP_POSTROLL]])
+    pcm = np.clip(np.round(x * 32767), -32768, 32767).astype("<i2")
+    channels = 1 if pcm.ndim == 1 else pcm.shape[1]
+    fmt = struct.pack("<HHIIHH", 1, channels, rate, rate * 2 * channels, 2 * channels, 16)
+    chunks = [(b"fmt ", fmt)]
+    if loop:
+        # 9 header fields (sample period in ns, MIDI unity note 60, one loop),
+        # then the loop: id, type 0 = forward, start, end, fraction, play count 0 = forever.
+        smpl = struct.pack("<9I", 0, 0, 1_000_000_000 // rate, 60, 0, 0, 0, 1, 0)
+        smpl += struct.pack("<6I", 0, 0, 0, frames, 0, 0)
+        chunks.append((b"smpl", smpl))
+    chunks.append((b"data", pcm.tobytes()))
+    body = b"WAVE" + b"".join(cid + struct.pack("<I", len(data)) + data for cid, data in chunks)
+    path.write_bytes(b"RIFF" + struct.pack("<I", len(body)) + body)
 
 
-def write_ogg(path: Path, x: np.ndarray) -> None:
+def write_ogg(path: Path, x: np.ndarray, rate: int = SR) -> None:
     """Encode float samples to Ogg Vorbis through ffmpeg (bit-exact, no metadata)."""
     channels = 1 if x.ndim == 1 else x.shape[1]
     cmd = [FFMPEG, "-hide_banner", "-loglevel", "error", "-y",
-           "-f", "f32le", "-ar", str(SR), "-ac", str(channels), "-i", "pipe:0",
+           "-f", "f32le", "-ar", str(rate), "-ac", str(channels), "-i", "pipe:0",
            "-c:a", "vorbis", "-strict", "-2", "-q:a", str(OGG_QUALITY),
            "-fflags", "+bitexact", "-flags:a", "+bitexact", "-map_metadata", "-1",
            str(path)]
@@ -671,16 +696,20 @@ def write_ogg(path: Path, x: np.ndarray) -> None:
 
 
 def write_sound(sound: Sound, x: np.ndarray) -> Path:
-    if sound.loop:
+    path = OUT_DIR / f"{sound.name}.{sound.codec}"
+    if sound.codec == "ogg":
         try:
-            path = OUT_DIR / f"{sound.name}.ogg"
-            write_ogg(path, x)
-            return path
+            write_ogg(path, x, sound.rate)
         except (OSError, subprocess.CalledProcessError) as err:
             print(f"warning: Vorbis encoding failed ({err}); writing {sound.name}.wav instead",
                   file=sys.stderr)
-    path = OUT_DIR / f"{sound.name}.wav"
-    write_wav(path, x)
+            path = path.with_suffix(".wav")
+    if path.suffix == ".wav":
+        write_wav(path, x, sound.rate, loop=sound.loop)
+    # Remove an output left over from a different format (but never Godot's .import files).
+    for stale in (path.with_suffix(".wav"), path.with_suffix(".ogg")):
+        if stale != path and stale.exists():
+            stale.unlink()
     return path
 
 
@@ -692,7 +721,9 @@ def read_audio(path: Path) -> tuple[int, np.ndarray]:
     """Read a written file back as float (n, channels).  Ogg files are decoded
     to 32-bit float by ffmpeg, so codec overshoot above 0 dBFS stays visible."""
     if path.suffix == ".wav":
-        sr, data = wavfile.read(path)
+        with warnings.catch_warnings():          # scipy skips the 'smpl' chunk with a warning
+            warnings.simplefilter("ignore", wavfile.WavFileWarning)
+            sr, data = wavfile.read(path)
         data = data.astype(np.float64) / 32768.0
     else:
         header = path.read_bytes()[:256]
@@ -705,46 +736,54 @@ def read_audio(path: Path) -> tuple[int, np.ndarray]:
     return sr, data if data.ndim == 2 else data[:, None]
 
 
+def wav_loop_end(path: Path) -> int:
+    """Loop end stored in a WAV file's 'smpl' chunk."""
+    data = path.read_bytes()
+    i = data.index(b"smpl") + 8                   # skip chunk id and size
+    return struct.unpack_from("<I", data, i + 36 + 12)[0]
+
+
 def db(x: float) -> float:
     return 20.0 * np.log10(max(x, 1e-12))
 
 
-def a_weighted_loudness(x: np.ndarray, window: float = 0.3) -> float:
+def a_weighted_loudness(x: np.ndarray, sr: int, window: float = 0.3) -> float:
     """A-weighted RMS (dBFS) of the loudest `window` seconds, channels averaged."""
-    f = np.fft.rfftfreq(len(x), 1.0 / SR)
+    f = np.fft.rfftfreq(len(x), 1.0 / sr)
     f2 = f ** 2
     weight = (12194.0 ** 2 * f2 ** 2) / ((f2 + 20.6 ** 2) * (f2 + 12194.0 ** 2)
                                          * np.sqrt((f2 + 107.7 ** 2) * (f2 + 737.9 ** 2)))
     weight *= 10.0 ** (2.0 / 20)                                       # 0 dB at 1 kHz
     weighted = np.fft.irfft(np.fft.rfft(x, axis=0) * weight[:, None], len(x), axis=0)
     power = np.mean(weighted ** 2, axis=1)
-    w = min(samples(window), len(power))
+    w = min(int(window * sr), len(power))
     sliding = np.convolve(power, np.ones(w) / w, mode="valid")
     return 10.0 * np.log10(max(sliding.max(), 1e-24))
 
 
-def dominant_frequency(x: np.ndarray, start: float = 0.0, end: float | None = None) -> float:
+def dominant_frequency(x: np.ndarray, sr: int, start: float = 0.0,
+                       end: float | None = None) -> float:
     """Strongest spectral peak (Hz) of the mono mix, with parabolic interpolation."""
-    mono = x.mean(axis=1)[samples(start):samples(end) if end else None]
+    mono = x.mean(axis=1)[int(start * sr):int(end * sr) if end else None]
     nfft = 1 << max(18, int(np.ceil(np.log2(len(mono)))))               # zero-padded
     spectrum = np.abs(np.fft.rfft(mono * np.hanning(len(mono)), nfft))
-    spectrum[:int(20.0 * nfft / SR) + 1] = 0.0                          # ignore < 20 Hz
+    spectrum[:int(20.0 * nfft / sr) + 1] = 0.0                          # ignore < 20 Hz
     k = int(np.argmax(spectrum))
     a, b, c = np.log(spectrum[k - 1:k + 2] + 1e-20)
-    return (k + 0.5 * (a - c) / (a - 2 * b + c)) * SR / nfft
+    return (k + 0.5 * (a - c) / (a - 2 * b + c)) * sr / nfft
 
 
-def seam_report(x: np.ndarray) -> dict[str, float]:
+def seam_report(x: np.ndarray, sr: int) -> dict[str, float]:
     """How audible is the wrap from the last sample back to the first?"""
     steps = np.abs(np.diff(x, axis=0)).max(axis=1)
     jump = np.abs(x[0] - x[-1]).max()
-    w = samples(0.05)
+    w = int(0.05 * sr)
     rms_step = db(np.sqrt(np.mean(x[:w] ** 2))) - db(np.sqrt(np.mean(x[-w:] ** 2)))
     # A click shows up as a burst above 8 kHz in the 10 ms around the junction.
     rolled = np.roll(x, len(x) // 2, axis=0)            # junction now in the middle
-    hf = signal.sosfiltfilt(signal.butter(4, 8000, "highpass", fs=SR, output="sos"),
+    hf = signal.sosfiltfilt(signal.butter(4, 8000, "highpass", fs=sr, output="sos"),
                             rolled, axis=0)
-    win = samples(0.01)
+    win = int(0.01 * sr)
     frames = np.mean(hf[:len(hf) // win * win].reshape(-1, win, hf.shape[1]) ** 2, axis=(1, 2))
     mid = len(x) // 2
     junction = np.mean(hf[mid - win // 2:mid + win // 2] ** 2)
@@ -756,12 +795,13 @@ def seam_report(x: np.ndarray) -> dict[str, float]:
             "hf_vs_rms_db": 10.0 * np.log10(junction / np.mean(x ** 2))}
 
 
-def third_octave_deviation(reference: np.ndarray, decoded: np.ndarray) -> float:
+def third_octave_deviation(reference: np.ndarray, decoded: np.ndarray, sr: int) -> float:
     """Largest 1/3-octave level difference (dB, 50 Hz-16 kHz, bands within
     40 dB of the loudest) between the pre-encode signal and the decoded Ogg --
-    a sanity check that the codec kept the spectrum intact."""
-    f, p_ref = signal.welch(reference.mean(axis=1), SR, nperseg=8192)
-    _, p_dec = signal.welch(decoded.mean(axis=1), SR, nperseg=8192)
+    a sanity check that the codec kept the spectrum intact.  Bands further down
+    hold only codec noise floor, which says nothing about quality."""
+    f, p_ref = signal.welch(reference.mean(axis=1), sr, nperseg=8192)
+    _, p_dec = signal.welch(decoded.mean(axis=1), sr, nperseg=8192)
     centres = 1000.0 * 2.0 ** (np.arange(-14, 13) / 3)
     levels = []
     for fc in centres:
@@ -776,16 +816,22 @@ def verify(results: list[tuple[Sound, Path, np.ndarray]]) -> bool:
     print("\nfile                   dur(s)     sr ch  peak dBFS  RMS dBFS  loud dBA"
           "  size KB  dominant Hz  suggested volume_db")
     total = 0
+    played = {}                                   # what the engine will actually play
     for sound, path, source in results:
         sr, x = read_audio(path)
+        problems = []
+        if sound.loop and path.suffix == ".wav":
+            end = wav_loop_end(path)
+            if not np.array_equal(x[end:], x[:len(x) - end]):
+                problems.append("post-roll does not repeat the loop start")
+            x = x[:end]
+        played[sound.name] = (sr, x)
         size = path.stat().st_size
         total += size
-        loud = a_weighted_loudness(x)
-        dom = dominant_frequency(x)
+        loud = a_weighted_loudness(x, sr)
         print(f"{path.name:<22} {len(x) / sr:6.3f} {sr:6d} {x.shape[1]:2d} {db(np.abs(x).max()):10.2f}"
               f" {db(np.sqrt(np.mean(x ** 2))):9.2f} {loud:9.2f} {size / 1024:8.1f}"
-              f" {dom:12.1f} {round(2 * (sound.target_db - loud)) / 2:+20.1f}")
-        problems = []
+              f" {dominant_frequency(x, sr):12.1f} {round(2 * (sound.target_db - loud)) / 2:+20.1f}")
         if not np.all(np.isfinite(x)):
             problems.append("non-finite samples")
         if np.abs(x).max() >= 0.999:
@@ -795,31 +841,36 @@ def verify(results: list[tuple[Sound, Path, np.ndarray]]) -> bool:
         if np.abs(x.mean(axis=0)).max() > 2e-3:
             problems.append("DC offset")
         if sound.loop and len(x) != len(source):
-            problems.append(f"decoded length {len(x)} != {len(source)}")
+            problems.append(f"loop length {len(x)} != {len(source)}")
         for problem in problems:
             print(f"  !! {path.name}: {problem}")
         ok &= not problems
-    print(f"total size: {total / 1024 / 1024:.2f} MB")
+    print(f"total size of the files above: {total / 1024 / 1024:.2f} MiB ({total / 1e6:.2f} MB)")
 
-    bells = [(s, p) for s, p, _ in results if s.name.startswith("bell_")]
+    bells = [s for s, _, _ in results if s.name.startswith("bell_")]
     if bells:
         print("\nbell pitch check (dominant frequency, 0.05-1.05 s):")
-        for sound, path in bells:
-            target = note(BELL_NOTES[int(sound.name[-2:])])
-            found = dominant_frequency(read_audio(path)[1], 0.05, 1.05)
-            error = 100.0 * (found / target - 1.0)
+        for sound in bells:
+            name = BELL_NOTES[int(sound.name[-2:])]
+            found = dominant_frequency(played[sound.name][1], SR, 0.05, 1.05)
+            error = 100.0 * (found / note(name) - 1.0)
             ok &= abs(error) < 1.0
-            print(f"  {sound.name}  {BELL_NOTES[int(sound.name[-2:])]:<3} target {target:8.2f} Hz"
+            print(f"  {sound.name}  {name:<3} target {note(name):8.2f} Hz"
                   f"  found {found:8.2f} Hz  error {error:+.3f}%")
 
     loops = [(s, p, src) for s, p, src in results if s.loop]
     if loops:
         print("\nloop seam check (wrap from last sample to first):")
         for sound, path, source in loops:
-            _, decoded = read_audio(path)
-            for label, x in (("source ", source), ("decoded", decoded)):
-                r = seam_report(x)
-                print(f"  {path.name:<16} {label}  |x[0]-x[-1]| {r['jump']:.4f}"
+            sr, x = played[sound.name]
+            if path.suffix == ".ogg":
+                checks = (("source", source), ("decoded", x))
+            else:
+                full = read_audio(path)[1]
+                checks = (("Godot", x), ("RIFF spec", full[:len(x) + 1]))   # end exclusive / inclusive
+            for label, y in checks:
+                r = seam_report(y, sr)
+                print(f"  {path.name:<16} {label:<9}  |x[0]-x[-1]| {r['jump']:.4f}"
                       f" ({r['jump_pct']:.2f}th pct of all steps; 99.9th pct = {r['p999_step']:.4f})"
                       f"  50 ms RMS step {r['rms_step_db']:+.2f} dB"
                       f"  >8 kHz at junction: {r['hf_vs_median_db']:+.1f} dB vs median,"
@@ -828,7 +879,7 @@ def verify(results: list[tuple[Sound, Path, np.ndarray]]) -> bool:
                        and (r["hf_vs_median_db"] < 6.0 or r["hf_vs_rms_db"] < -50.0))
             if path.suffix == ".ogg":
                 print(f"  {path.name:<16} codec 1/3-octave deviation (50 Hz-16 kHz):"
-                      f" {third_octave_deviation(source, decoded):.2f} dB")
+                      f" {third_octave_deviation(source, x, sr):.2f} dB")
     print("\nall checks passed" if ok else "\nSOME CHECKS FAILED")
     return ok
 
@@ -851,7 +902,7 @@ def main(argv: list[str] | None = None) -> int:
     for sound in selected:
         rng = np.random.default_rng(zlib.crc32(sound.name.encode()))
         x = sound.build(rng)
-        x = finish_loop(x) if sound.loop else finish_sfx(x)
+        x = finish_loop(x, sound.rate) if sound.loop else finish_sfx(x)
         path = write_sound(sound, x)
         print(f"wrote {path.relative_to(OUT_DIR.parent)}  -- {sound.description}")
         results.append((sound, path, x if x.ndim == 2 else x[:, None]))

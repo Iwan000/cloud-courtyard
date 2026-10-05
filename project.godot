@@ -20,8 +20,8 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-Game="*res://scripts/autoload/game.gd"
 Sfx="*res://scripts/autoload/sfx.gd"
+Game="*res://scripts/autoload/game.gd"
 
 [display]
 
