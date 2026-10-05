@@ -145,7 +145,7 @@ func go_title() -> void:
 	t.select_pressed.connect(func(): go_select())
 	t.editor_pressed.connect(func(): go_editor(null))
 	t.settings_pressed.connect(_open_settings)
-	t.quit_pressed.connect(func(): get_tree().quit())
+	t.quit_pressed.connect(func(): Game.quit_game())
 	screen_node = t
 	t.focus_first()
 

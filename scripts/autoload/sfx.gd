@@ -162,8 +162,8 @@ func set_bus_volume(bus_name: String, linear: float) -> void:
 		AudioServer.set_bus_mute(idx, linear <= 0.001)
 
 
-## 退出时停止所有播放并释放音频流，避免退出时报告资源泄漏。
-func _exit_tree() -> void:
+## 停止所有播放并释放音频流（退出前调用，避免退出时报告资源泄漏）。
+func stop_all() -> void:
 	for p in _pool + [_music, _water]:
 		p.stop()
 		p.stream = null

@@ -40,7 +40,7 @@ func _run() -> void:
 	await _real_input_flow()
 	await _editor_flow()
 	print("[smoke] %s" % ("PASSED" if _failures.is_empty() else "FAILED: %s" % [_failures]))
-	get_tree().quit(0 if _failures.is_empty() else 1)
+	Game.quit_game(0 if _failures.is_empty() else 1)
 
 
 func _play_through(lvl: LevelData) -> void:

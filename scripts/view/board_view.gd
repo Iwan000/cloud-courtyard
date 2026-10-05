@@ -50,6 +50,12 @@ func setup(st: SokobanState, material_lib: ThemePalette.MaterialLib, theme_dict:
 	fx = Fx.new()
 	fx.name = "Fx"
 	add_child(fx)
+	# 常驻的漂浮光尘（星夜里像萤火虫）
+	var lv := st.level
+	var center := Vector3((lv.width - 1) * 0.5, 0.0, (lv.height - 1) * 0.5)
+	var night := Color(theme_dict["sky_top"]).get_luminance() < 0.3
+	var mote_col := Color(theme_dict["target_glow"]) if night else Color(1, 1, 1)
+	fx.ambient_motes(center, Vector2(lv.width * 0.5, lv.height * 0.5), mote_col, 26 if night else 16)
 	var target_mesh := Props.make_target_mesh(mats)
 	for t in st.level.target_list():
 		var mi := MeshInstance3D.new()

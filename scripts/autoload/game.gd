@@ -61,6 +61,7 @@ func _register_input() -> void:
 
 
 func _ready() -> void:
+	get_tree().set_auto_accept_quit(false)
 	_register_input()
 	load_builtin_levels()
 	load_custom_levels()
@@ -85,7 +86,20 @@ func _process(_delta: float) -> void:
 		var img := get_viewport().get_texture().get_image()
 		img.save_png(_shot_path)
 		print("[shot] saved ", _shot_path, " ", img.get_size())
-		get_tree().quit()
+		quit_game()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		quit_game()
+
+
+## 退出游戏：先停止音频并等音频线程释放播放实例，再退出。
+func quit_game(code := 0) -> void:
+	Sfx.stop_all()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	get_tree().quit(code)
 
 
 # ---------------------------------------------------------------------------

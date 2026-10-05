@@ -15,8 +15,14 @@ func request(state: SokobanState) -> void:
 	_key = state.snapshot_key()
 	if _cache.has(_key):
 		return
+	# 玩家目前的操作恰好是已存最优解的前缀：直接用剩余部分作答，无需求解
+	var played := state.history_lurd()
+	var stored := state.level.solution
+	if stored != "" and stored.begins_with(played) and played.length() < stored.length():
+		_cache[_key] = _first_push(stored.substr(played.length()), SokobanSolver.Status.SOLVED)
+		return
 	_solver = SokobanSolver.new()
-	_solver.max_msec = 8000
+	_solver.max_msec = 15000
 	var lvl := state.level
 	var boxes := state.boxes.duplicate()
 	var player := state.player
@@ -36,15 +42,22 @@ func poll(state: SokobanState) -> Dictionary:
 		return {}
 	WorkerThreadPool.wait_for_task_completion(_task)
 	_task = -1
-	var res := {"status": _solver.status, "walk": [] as Array[int], "push_dir": -1}
-	if _solver.status == SokobanSolver.Status.SOLVED:
-		for ch in _solver.solution:
-			var d := SokobanState.DIR_CHARS.find(ch.to_lower())
-			if ch == ch.to_upper():
-				res["push_dir"] = d
-				break
-			(res["walk"] as Array[int]).append(d)
+	var res := _first_push(_solver.solution, _solver.status)
 	_cache[key] = res
+	return res
+
+
+## 从 LURD 解中取出第一次推箱之前的行走路径与推动方向。
+static func _first_push(lurd: String, status: int) -> Dictionary:
+	var res := {"status": status, "walk": [] as Array[int], "push_dir": -1}
+	if status != SokobanSolver.Status.SOLVED:
+		return res
+	for ch in lurd:
+		var d := SokobanState.DIR_CHARS.find(ch.to_lower())
+		if ch == ch.to_upper():
+			res["push_dir"] = d
+			break
+		(res["walk"] as Array[int]).append(d)
 	return res
 
 
