@@ -1,21 +1,21 @@
 {
   "format": 1,
   "id": "04",
-  "name": "紫藤",
-  "name_en": "Wisteria Gallery",
+  "name": "掌灯",
+  "name_en": "Lamplighter",
   "theme": "lavender",
-  "seed": 7203,
-  "par_moves": 60,
-  "par_pushes": 18,
-  "solution": "UUruLddlllddRdrUUdlluurRdrrUUluRddrrrddLdlUUdrruulLdlUUddlUU",
+  "seed": 5150,
+  "par_moves": 45,
+  "par_pushes": 14,
+  "solution": "rrUruululldDDuuullDldRRlddrRuUUdrRurrdLLLrddL",
   "map": [
-    "  ######",
-    " ##....##",
-    "##-#--#-##",
-    "#---$$---#",
-    "#-#-@--#-#",
-    "#-$-##-$-#",
-    "##------##",
-    " ########"
-  ]
+    "  #######",
+    "###--.--###",
+    "#--$#-#---#",
+    "#----*----#",
+    "#---#-#$--#",
+    "###--+--###",
+    "  #######"
+  ],
+  "note": "这关很不错，我的游玩体验是它让我真的开始思考了。这关存在很多需要反复来回的地方，比如中间的方块需要往下推到底，然后再次推开离开自己的目的地，左右两侧的也是要先推开给玩家让路再推回去，我觉得难度是教学“反复/让路”这件事的挑战关级别。"
 }

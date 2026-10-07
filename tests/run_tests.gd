@@ -23,6 +23,7 @@ func _init() -> void:
 		"test_resize_trim",
 		"test_solver_small",
 		"test_solver_unsolvable",
+		"test_grades",
 		"test_builtin_levels",
 	]
 	for t in tests:
@@ -83,6 +84,10 @@ func test_json_roundtrip() -> void:
 	var back := LevelData.from_dict(parsed)
 	check(back.to_rows() == l.to_rows(), "map roundtrip")
 	check(back.name == "测试" and back.theme == "dusk" and back.decor_seed == 42, "meta roundtrip")
+	check(not parsed.has("grades"), "grades omitted when unset")
+	l.grades = PackedInt32Array([5, 9])
+	back = LevelData.from_dict(JSON.parse_string(l.to_json_string()))
+	check(back.grades == PackedInt32Array([5, 9]), "grades roundtrip")
 
 
 func test_move_and_push() -> void:
@@ -215,6 +220,24 @@ func test_solver_unsolvable() -> void:
 	check(solver.solve(l) == SokobanSolver.Status.SOLVED, "side-by-side solvable")
 	var st := solver.solve(dead)
 	check(st == SokobanSolver.Status.UNSOLVABLE, "deadlocked level unsolvable (%s)" % solver.status_text())
+
+
+func test_grades() -> void:
+	var l := lvl(["######", "#@$-.#", "######"])
+	check(l.grade_limits() == Vector2i(-1, -1) and l.petals_for(999) == 3, "no par: always three petals")
+	# 默认分档：三瓣 par + max(3, 25%)，两瓣 par + max(8, 60%)
+	var expected := {13: Vector2i(16, 21), 15: Vector2i(19, 24), 30: Vector2i(38, 48), 45: Vector2i(56, 72), 71: Vector2i(89, 114)}
+	for par in expected:
+		l.par_moves = par
+		check(l.grade_limits() == expected[par], "default grades for par %d: %s" % [par, l.grade_limits()])
+	l.par_moves = 30
+	check(l.petals_for(30) == 3 and l.petals_for(38) == 3, "three petals up to the first limit")
+	check(l.petals_for(39) == 2 and l.petals_for(48) == 2, "two petals up to the second limit")
+	check(l.petals_for(49) == 1, "one petal beyond")
+	l.grades = PackedInt32Array([33, 40])
+	check(l.grade_limits() == Vector2i(33, 40), "manual grades")
+	l.grades = PackedInt32Array([20, 10])
+	check(l.grade_limits() == Vector2i(30, 30), "manual grades clamped to par and ordered")
 
 
 func test_builtin_levels() -> void:

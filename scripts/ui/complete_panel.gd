@@ -1,6 +1,7 @@
 class_name CompletePanel
 extends Control
-## 通关结算：庭院已苏醒。显示步数、最佳与参考步数，以及三枚花瓣评价。
+## 通关结算：庭院已苏醒。显示步数与最佳记录，以及三枚花瓣评价（分档见 LevelData.grade_limits）。
+## 不显示全局最优步数；未得三瓣时给出三瓣的步数范围作为目标。
 
 const SHADE_SHADER := preload("res://shaders/ui_bottom_shade.gdshader")
 
@@ -36,7 +37,7 @@ func build(lvl: LevelData, moves: int, _pushes: int, best: int, new_record: bool
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 
-	var rating := _rating(moves, lvl.par_moves)
+	var rating := lvl.petals_for(moves)
 	var petals := Petals.new()
 	petals.count = rating
 	petals.custom_minimum_size = Vector2(180, 54)
@@ -46,8 +47,8 @@ func build(lvl: LevelData, moves: int, _pushes: int, best: int, new_record: bool
 	var parts: Array[String] = ["步数 %d" % moves]
 	if best > 0:
 		parts.append(("新纪录" if new_record else "最佳 %d" % best))
-	if lvl.par_moves > 0:
-		parts.append("参考 %d" % lvl.par_moves)
+	if rating < 3:
+		parts.append("三瓣：%d 步以内" % lvl.grade_limits().x)
 	var stats := UiKit.label("    ·    ".join(parts), 21, 500, Color(UiKit.ink, 0.75))
 	stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(stats)
@@ -92,16 +93,6 @@ func focus_default() -> void:
 
 
 ## 评价：不超过参考步数 3 瓣，不超过 1.3 倍 2 瓣，其余 1 瓣。
-static func _rating(moves: int, par: int) -> int:
-	if par <= 0:
-		return 3
-	if moves <= par:
-		return 3
-	if moves <= int(ceil(par * 1.3)):
-		return 2
-	return 1
-
-
 class Petals:
 	extends Control
 	## 三枚花瓣（菱形），获得的依次点亮。

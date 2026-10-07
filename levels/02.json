@@ -1,21 +1,21 @@
 {
   "format": 1,
   "id": "02",
-  "name": "水镜",
-  "name_en": "Mirror Pool",
+  "name": "花径",
+  "name_en": "Garden Path",
   "theme": "garden",
-  "seed": 3301,
-  "par_moves": 26,
-  "par_pushes": 10,
-  "solution": "uulluRRurDldRRRuLLulDrdLLL",
+  "seed": 1024,
+  "par_moves": 15,
+  "par_pushes": 5,
+  "solution": "RUUrrddLruulldD",
   "map": [
-    "   ####",
-    "   #--#",
-    "####--####",
-    "#--$--$--#",
-    "#.------.#",
-    "####--####",
-    "   #@-#",
-    "   ####"
-  ]
+    " #####",
+    "##-.-##",
+    "#-----#",
+    "#-#$#-#",
+    "#-@$--#",
+    "##-.-##",
+    " #####"
+  ],
+  "note": "加入第一关之后，第二关的难度感觉还可以，首先多了一个箱子，这里引入了玩家学会把一个箱子推开给另一个箱子/人物让出空间移动。"
 }

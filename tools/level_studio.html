@@ -129,6 +129,7 @@ kbd { font:11px Menlo, monospace; background:#eee; border:1px solid #ddd; border
         <label>英文名</label><input id="fNameEn">
         <label>主题</label><select id="fTheme"></select>
         <label>种子</label><div style="display:flex;gap:6px"><input id="fSeed" type="number"><button id="btnSeed" title="换一种程序化装饰（树、水、楼梯）">随机</button></div>
+        <label>评分分档</label><div style="display:flex;gap:6px;align-items:center"><input id="fG3" type="number" title="三瓣：不超过这个步数"><input id="fG2" type="number" title="两瓣：不超过这个步数"><span class="legend" style="white-space:nowrap">留空用默认</span></div>
         <label>设计意图</label><textarea id="fNote" placeholder="这一关想让玩家学会/体会什么？（存为关卡 JSON 的 note 字段，游戏不读取）"></textarea>
       </div>
     </div>
@@ -536,6 +537,7 @@ function renderCurve() {
     ["地板", lv => lay(lv)?.floor],
     ["步数", lv => sol(lv)?.par_moves],
     ["推动", lv => sol(lv)?.par_pushes],
+    ["三瓣线", lv => gradesOf(lv)?.three],
     ["搜索状态", lv => sol(lv)?.expanded, v => Math.log10(v + 1)],
     ["隐蔽陷阱", lv => trapsOf(lv)?.hidden],
     ["明显陷阱", lv => trapsOf(lv)?.simple],
@@ -554,6 +556,17 @@ function renderCurve() {
   });
   $("#curveTable").innerHTML = html;
 }
+// 结算花瓣分档，与 LevelData.grade_limits 一致：三瓣 par + max(3, 25%)，两瓣 par + max(8, 60%)，可手动指定
+function gradesOf(lv) {
+  const s = sol(lv);
+  if (!s) return null;
+  const par = s.par_moves, g = lv.data.grades;
+  if (Array.isArray(g) && g.length === 2) {
+    const three = Math.max(g[0], par);
+    return { three, two: Math.max(g[1], three), custom: true, raw: g };
+  }
+  return { three: par + Math.max(3, Math.round(par * 0.25)), two: par + Math.max(8, Math.round(par * 0.6)), custom: false };
+}
 const lay = lv => (lv.analysis && lv.akey === akeyOf(lv)) ? lv.analysis.layout : undefined;
 const sol = lv => (lv.analysis && lv.akey === akeyOf(lv)) ? lv.analysis.solution : undefined;
 
@@ -571,12 +584,20 @@ function renderPanel() {
       msgs += `<div class="e">! 搜索状态 ${n}，接近游戏内求解器上限（${GD_MAX_STATES}），提示功能可能失效、单元测试可能失败</div>`;
     else if (n > 50000)
       msgs += `<div class="w">! 搜索状态 ${n}，游戏内求解约需 ${(n * GD_MS_PER_STATE / 1000).toFixed(1)} 秒（单元测试与提示功能会变慢）</div>`;
+    const gr = gradesOf(lv);
+    if (gr && gr.custom && (gr.raw[0] < a.solution.par_moves || gr.raw[1] < gr.raw[0]))
+      msgs += `<div class="w">! 手动分档低于最优步数或顺序颠倒，游戏内会校正为 三瓣 ≤ ${gr.three}、两瓣 ≤ ${gr.two}</div>`;
     if (a.solution && !a.errors.length) msgs += `<div class="o">✓ 可解${isDirty(lv) ? "（保存时会写入新的参考步数与最优解）" : ""}</div>`;
   }
   $("#msgs").innerHTML = msgs;
   let stats = "";
   if (a && a.layout) stats += `<span>尺寸</span>${a.layout.width}×${a.layout.height}<span>地板</span>${a.layout.floor}<span>箱子</span>${a.layout.boxes}<span>死格</span>${a.layout.dead.length}`;
   if (a && a.solution) stats += `<span>最优步数</span>${a.solution.par_moves}<span>最优推动</span>${a.solution.par_pushes}<span>搜索状态</span>${a.solution.expanded}<span>求解</span>${a.solution.seconds}s`;
+  const gr = gradesOf(lv);
+  if (gr) stats += `<span>三瓣</span>≤ ${gr.three}<span>两瓣</span>≤ ${gr.two}${gr.custom ? "<span>分档</span>手动" : "<span>分档</span>默认"}`;
+  const def = gr && !gr.custom ? gr : null;
+  $("#fG3").placeholder = def ? `三瓣 ${def.three}` : "三瓣";
+  $("#fG2").placeholder = def ? `两瓣 ${def.two}` : "两瓣";
   $("#stats").innerHTML = stats;
 
   const tr = trapsOf(lv);
@@ -649,6 +670,8 @@ function renderForm() {
   const d = L().data;
   $("#fName").value = d.name || ""; $("#fNameEn").value = d.name_en || "";
   $("#fTheme").value = d.theme; $("#fSeed").value = d.seed ?? 0; $("#fNote").value = d.note || "";
+  const g = Array.isArray(d.grades) ? d.grades : ["", ""];
+  $("#fG3").value = g[0]; $("#fG2").value = g[1];
   syncText(true);
 }
 
@@ -743,6 +766,18 @@ bindField("#fName", (d, v) => d.name = v);
 bindField("#fNameEn", (d, v) => d.name_en = v);
 bindField("#fSeed", (d, v) => d.seed = parseInt(v, 10) || 0);
 bindField("#fNote", (d, v) => { if (v.trim()) d.note = v; else delete d.note; });
+// 分档：两格都空 = 用默认；只填一格时另一格取当前默认值
+function onGradesInput() {
+  const d = L().data, a = parseInt($("#fG3").value, 10), b = parseInt($("#fG2").value, 10);
+  if (isNaN(a) && isNaN(b)) delete d.grades;
+  else {
+    const par = sol(L())?.par_moves || 0;
+    d.grades = [isNaN(a) ? par + Math.max(3, Math.round(par * 0.25)) : a, isNaN(b) ? par + Math.max(8, Math.round(par * 0.6)) : b];
+  }
+  onMetaChanged();
+}
+$("#fG3").addEventListener("input", onGradesInput);
+$("#fG2").addEventListener("input", onGradesInput);
 $("#fTheme").addEventListener("change", e => { L().data.theme = e.target.value; onMetaChanged(); });
 $("#btnSeed").onclick = () => { L().data.seed = 1000 + Math.floor(Math.random() * 9000); $("#fSeed").value = L().data.seed; onMetaChanged(); };
 function onMetaChanged() { schedule(400); renderAll(); }

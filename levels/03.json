@@ -1,20 +1,21 @@
 {
   "format": 1,
   "id": "03",
-  "name": "掌灯",
-  "name_en": "Lamplighter",
+  "name": "易位",
+  "name_en": "Changing Places",
   "theme": "dusk",
-  "seed": 5150,
-  "par_moves": 45,
-  "par_pushes": 14,
-  "solution": "rrUruululldDDuuullDldRRlddrRuUUdrRurrdLLLrddL",
+  "seed": 9741,
+  "par_moves": 30,
+  "par_pushes": 10,
+  "solution": "dDuullddRdRRUrDldRullluRRluurD",
   "map": [
-    "  #######",
-    "###--.--###",
-    "#--$#-#---#",
-    "#----*----#",
-    "#---#-#$--#",
-    "###--+--###",
-    "  #######"
-  ]
+    "######",
+    "#--@-#",
+    "#-#--##",
+    "#-$$*.#",
+    "#-----##",
+    "####--.#",
+    "   #####"
+  ],
+  "note": "这关玩家需要推开两个箱子给一个箱子让路，这关开始就涉及到较多的路径规划了，因为很容易把某个箱子推过去之后另一个箱子就没法动了。我认为它是引入了应该把已经在目标上的箱子推开，和深度考虑路径次序和规划的一关。衔接第四关是相对合适的。"
 }

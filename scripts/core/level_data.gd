@@ -22,6 +22,9 @@ var decor_seed: int = 0
 var par_moves: int = -1
 var par_pushes: int = -1
 var solution: String = ""
+## 结算评分的步数分档 [三瓣上限, 两瓣上限]，可在关卡 JSON 的 "grades" 中手动指定；
+## 为空时按 par 自动计算（见 grade_limits）。
+var grades: PackedInt32Array = PackedInt32Array()
 
 var width: int = 0
 var height: int = 0
@@ -128,6 +131,7 @@ func duplicate_level() -> LevelData:
 	lvl.par_moves = par_moves
 	lvl.par_pushes = par_pushes
 	lvl.solution = solution
+	lvl.grades = grades.duplicate()
 	lvl.width = width
 	lvl.height = height
 	lvl.cells = cells.duplicate()
@@ -135,6 +139,29 @@ func duplicate_level() -> LevelData:
 	lvl.boxes = boxes.duplicate()
 	lvl.player = player
 	return lvl
+
+
+## 结算花瓣的步数分档：Vector2i(三瓣上限, 两瓣上限)；没有 par 时返回 (-1, -1)。
+## 不以全局最优为门槛（人很难找到最优解），默认在最优步数上留出余量：
+##   三瓣：par + max(3, 25%)    两瓣：par + max(8, 60%)    一瓣：通关即得
+## 关卡可用 "grades" 手动指定；分档不会低于 par，两瓣上限也不会低于三瓣上限。
+func grade_limits() -> Vector2i:
+	if par_moves <= 0:
+		return Vector2i(-1, -1)
+	var three := par_moves + maxi(3, roundi(par_moves * 0.25))
+	var two := par_moves + maxi(8, roundi(par_moves * 0.6))
+	if grades.size() == 2:
+		three = maxi(grades[0], par_moves)
+		two = maxi(grades[1], three)
+	return Vector2i(three, two)
+
+
+## 用 moves 步通关可得的花瓣数（1~3）。没有 par 的关卡（如未求解的自制关卡）一律三瓣。
+func petals_for(moves: int) -> int:
+	var lim := grade_limits()
+	if lim.x < 0 or moves <= lim.x:
+		return 3
+	return 2 if moves <= lim.y else 1
 
 
 ## 地图内容（不含元信息）的指纹，用于判断关卡是否被修改过、par 是否仍然有效。
@@ -185,6 +212,7 @@ func trimmed() -> LevelData:
 	lvl.par_moves = par_moves
 	lvl.par_pushes = par_pushes
 	lvl.solution = solution
+	lvl.grades = grades.duplicate()
 	return lvl
 
 
@@ -320,7 +348,7 @@ static func from_xsb(text: String) -> LevelData:
 # ---------------------------------------------------------------------------
 
 func to_dict() -> Dictionary:
-	return {
+	var d := {
 		"format": FORMAT_VERSION,
 		"id": id,
 		"name": name,
@@ -332,6 +360,9 @@ func to_dict() -> Dictionary:
 		"solution": solution,
 		"map": Array(to_rows(true)),
 	}
+	if grades.size() == 2:
+		d["grades"] = Array(grades)
+	return d
 
 
 static func from_dict(d: Dictionary) -> LevelData:
@@ -348,6 +379,9 @@ static func from_dict(d: Dictionary) -> LevelData:
 	lvl.par_moves = int(d.get("par_moves", -1))
 	lvl.par_pushes = int(d.get("par_pushes", -1))
 	lvl.solution = str(d.get("solution", ""))
+	var g: Variant = d.get("grades", [])
+	if g is Array and g.size() == 2:
+		lvl.grades = PackedInt32Array([int(g[0]), int(g[1])])
 	return lvl
 
 
@@ -355,8 +389,9 @@ func to_json_string() -> String:
 	# 手写 JSON 以保证地图每行一行，便于 diff 和人工阅读
 	var d := to_dict()
 	var out := "{\n"
-	for key in ["format", "id", "name", "name_en", "theme", "seed", "par_moves", "par_pushes", "solution"]:
-		out += "  %s: %s,\n" % [JSON.stringify(key), JSON.stringify(d[key])]
+	for key in ["format", "id", "name", "name_en", "theme", "seed", "par_moves", "par_pushes", "solution", "grades"]:
+		if d.has(key):
+			out += "  %s: %s,\n" % [JSON.stringify(key), JSON.stringify(d[key])]
 	out += "  \"map\": [\n"
 	var rows: Array = d["map"]
 	for i in rows.size():

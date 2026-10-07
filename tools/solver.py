@@ -78,7 +78,7 @@ DESIGN_MAX_FLOOR = 45
 # Canonical key order for level files; unknown keys are kept after these.
 KEY_ORDER: tuple[str, ...] = (
     "format", "id", "name", "name_en", "theme", "seed",
-    "par_moves", "par_pushes", "solution", "map",
+    "par_moves", "par_pushes", "solution", "grades", "map",
 )
 
 

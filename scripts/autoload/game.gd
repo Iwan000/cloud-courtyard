@@ -62,16 +62,17 @@ func _register_input() -> void:
 
 func _ready() -> void:
 	get_tree().set_auto_accept_quit(false)
+	# 先解析命令行：后面的存档读取与设置应用会参考开发参数
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--"):
+			var kv := a.substr(2).split("=", true, 1)
+			cmd_args[kv[0]] = kv[1] if kv.size() > 1 else "true"
 	_register_input()
 	load_builtin_levels()
 	load_custom_levels()
 	_load_progress()
 	_load_settings()
 	apply_settings()
-	for a in OS.get_cmdline_user_args():
-		if a.begins_with("--"):
-			var kv := a.substr(2).split("=", true, 1)
-			cmd_args[kv[0]] = kv[1] if kv.size() > 1 else "true"
 	_shot_path = cmd_args.get("shot", "")
 	if cmd_args.has("pitch"):
 		World.pitch_deg = float(cmd_args["pitch"])
@@ -212,6 +213,9 @@ func reset_progress() -> void:
 
 
 func _load_progress() -> void:
+	if _is_dev_run():
+		progress = {}  # 截图/自动化测试从全新进度开始，结果与玩家存档无关
+		return
 	var d: Variant = _load_json(PROGRESS_PATH)
 	progress = d if d is Dictionary else {}
 
@@ -249,9 +253,14 @@ func _load_settings() -> void:
 # 工具
 # ---------------------------------------------------------------------------
 
+## 截图与自动化测试：不读写玩家存档。
+func _is_dev_run() -> bool:
+	return cmd_args.has("smoke") or cmd_args.has("shot")
+
+
 func _save_json(path: String, data: Variant) -> void:
-	if cmd_args.has("smoke"):
-		return  # 自动化测试不写入玩家存档
+	if _is_dev_run():
+		return
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(data, "  "))
