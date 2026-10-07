@@ -189,7 +189,7 @@ godot --headless --path . --fixed-fps 60 -- --smoke
 | `tools/level_studio.py` | 开发用的网页关卡工作台（`python3 tools/level_studio.py`，打开 http://127.0.0.1:8765）：总览全部关卡与难度曲线，网格/XSB 双向编辑，浏览器内试玩与最优解回放，陷阱分析，保存时自动写入 par 值，可一键在 Godot 中打开该关 |
 | `tools/solver.py` | 离线求解与关卡验证，`--write` 把 par 值和最优解写回关卡 JSON |
 | `tools/gen_audio.py` | 用 numpy 合成全部音效与音乐，可复现 |
-| `tools/subset_fonts.py` | 扫描代码与关卡中用到的字符，把思源黑体子集化，并导出 400/500/600/700 四个静态字重（17 MB → 4 × 约 300 KB） |
+| `tools/subset_fonts.py` | 扫描代码与关卡中用到的字符，把思源黑体子集化，并导出 400/500/600/700 四个静态字重（17 MB → 4 × 约 300 KB）。原始字体放在 `fonts_src/NotoSansSC.ttf`（不提交），关卡或界面用到新汉字后重新运行 |
 
 ## 扩展指南
 

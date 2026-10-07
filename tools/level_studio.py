@@ -24,7 +24,7 @@ API (JSON over HTTP)::
     POST /api/analyze  {map, traps}  validate + solve (+ trap profile)
     POST /api/save     {id, data}    write levels/<id>.json
     POST /api/create   {from?}       new level (or a copy of <from>)
-    POST /api/delete   {id}
+    POST /api/delete   {id}          move to .level_trash/, renumber the rest
     POST /api/swap     {a, b}        swap the order of two levels
     POST /api/play     {id}          launch Godot straight into the level
 """
@@ -42,6 +42,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -49,6 +50,7 @@ from pathlib import Path
 TOOLS = Path(__file__).resolve().parent
 ROOT = TOOLS.parent
 LEVELS = ROOT / "levels"
+TRASH = ROOT / ".level_trash"     # deleted levels go here (git-ignored, Godot-ignored)
 PAGE = TOOLS / "level_studio.html"
 FONT = ROOT / "fonts" / "NotoSansSC-500.ttf"
 
@@ -352,7 +354,7 @@ class Handler(BaseHTTPRequestHandler):
         if missing:
             result["warnings"].append(
                 f"名称里的「{missing}」不在游戏字体子集中，会用系统字体显示；"
-                "定稿后运行 tools/subset_fonts.py 重新子集化")
+                "定稿后运行 python3 tools/subset_fonts.py 重新子集化")
         return result
 
     def api_save(self, body: dict) -> dict:
@@ -383,10 +385,15 @@ class Handler(BaseHTTPRequestHandler):
         return {"id": new_id, "data": data}
 
     def api_delete(self, body: dict) -> dict:
+        """Soft delete: drafts may never have been committed, so keep a copy."""
         with _write_lock:
-            level_path(body["id"]).unlink()
+            path = level_path(body["id"])
+            TRASH.mkdir(exist_ok=True)
+            (TRASH / ".gdignore").touch()
+            target = TRASH / f"{time.strftime('%Y%m%d-%H%M%S')}_{path.name}"
+            shutil.move(str(path), str(target))
             renumber()
-        return {"ok": True}
+        return {"ok": True, "trash": str(target.relative_to(ROOT))}
 
     def api_swap(self, body: dict) -> dict:
         """Swap two levels' positions: each file takes the other's id."""

@@ -157,7 +157,8 @@ const THEME_SKY = { dawn: ["#9fd6e6", "#f6e7e3"], garden: ["#b9e8e3", "#fff1dc"]
                     lavender: ["#c3cff6", "#f6dbeb"], night: ["#10133a", "#3d2f7c"] };
 const THEME_ZH = { dawn: "晨曦", garden: "花园", dusk: "黄昏", lavender: "紫藤", night: "星夜" };
 const MIN_W = 16, MIN_H = 12, PAD = 2, CELL = 34;
-const HARDEST_EXPANDED = 13450;   // 现有最难关卡（第 4 关）的搜索状态数，游戏内求解器已验证够快
+// 游戏内 GDScript 求解器：实测每个搜索状态约 0.028 ms（第 4 关 13449 状态 ≈ 380 ms），上限 40 万状态
+const GD_MS_PER_STATE = 0.028, GD_MAX_STATES = 400000;
 const COLORS = { floor: "#ece3d3", floorLine: "#ddd2bf", wall: "#5d6677", wallTop: "#77819a", target: "#d9774b",
                  box: "#b98552", boxEdge: "#8a5f37", boxDone: "#5f9e6e", boxDoneEdge: "#3f7a4f", player: "#3d6fb6",
                  dead: "rgba(192,57,43,.35)", grid: "#eeeae3" };
@@ -565,8 +566,11 @@ function renderPanel() {
   else {
     msgs += a.errors.map(e => `<div class="e">✗ ${esc(e)}</div>`).join("");
     msgs += a.warnings.map(w => `<div class="w">! ${esc(w)}</div>`).join("");
-    if (a.solution && a.solution.expanded > HARDEST_EXPANDED * 2)
-      msgs += `<div class="w">! 搜索状态 ${a.solution.expanded}，远超现有最难关卡（${HARDEST_EXPANDED}），游戏内的提示求解和单元测试可能明显变慢</div>`;
+    const n = a.solution ? a.solution.expanded : 0;
+    if (n > GD_MAX_STATES * 0.75)
+      msgs += `<div class="e">! 搜索状态 ${n}，接近游戏内求解器上限（${GD_MAX_STATES}），提示功能可能失效、单元测试可能失败</div>`;
+    else if (n > 50000)
+      msgs += `<div class="w">! 搜索状态 ${n}，游戏内求解约需 ${(n * GD_MS_PER_STATE / 1000).toFixed(1)} 秒（单元测试与提示功能会变慢）</div>`;
     if (a.solution && !a.errors.length) msgs += `<div class="o">✓ 可解${isDirty(lv) ? "（保存时会写入新的参考步数与最优解）" : ""}</div>`;
   }
   $("#msgs").innerHTML = msgs;
@@ -846,8 +850,8 @@ $("#btnDup").onclick = async () => {
 $("#btnDel").onclick = async () => {
   const lv = L();
   if (!requireAllSaved()) return;
-  if (!confirm(`删除 ${numeral(lv)} ${lv.data.name}（levels/${lv.id}.json）？\n后面的关卡会自动前移编号。文件可用 git 恢复。`)) return;
-  try { await api("/api/delete", { id: lv.id }); await reload(levels[Math.max(0, cur - 1)].id); setStatus("已删除"); }
+  if (!confirm(`删除 ${numeral(lv)} ${lv.data.name}（levels/${lv.id}.json）？\n文件会移到 .level_trash/（不提交到 git），需要时可以拿回来；后面的关卡会自动前移编号。`)) return;
+  try { const j = await api("/api/delete", { id: lv.id }); await reload(levels[Math.max(0, cur - 1)].id); setStatus(`已删除，原文件在 ${j.trash}`); }
   catch (e) { setStatus("删除失败：" + e.message, true); }
 };
 async function swapWith(delta) {
