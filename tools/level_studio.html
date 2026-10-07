@@ -1,0 +1,916 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>关卡工作台</title>
+<style>
+:root { --ink:#2b2f36; --mute:#7c828c; --line:#dcd8d0; --bg:#f5f3ef; --card:#fff; --accent:#3d6fb6;
+        --err:#c0392b; --warn:#a86a12; --ok:#2f7d55; --hidden:#c0392b; --simple:#e7a04a; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.5 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+header { display:flex; align-items:center; gap:6px; padding:8px 14px; background:#fff; border-bottom:1px solid var(--line); position:sticky; top:0; z-index:5; }
+header b { font-size:15px; margin-right:12px; }
+button { font:inherit; padding:3px 10px; border:1px solid var(--line); background:#fff; border-radius:4px; cursor:pointer; color:var(--ink); }
+button:hover:not(:disabled) { border-color:#a9a397; }
+button.on, button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+button:disabled { opacity:.4; cursor:default; }
+.grow { flex:1; }
+.sep { width:1px; height:18px; background:var(--line); margin:0 6px; }
+#status { color:var(--mute); margin-right:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:40vw; }
+#status.bad { color:var(--err); }
+#top { display:flex; gap:14px; padding:12px 14px 4px; align-items:flex-start; }
+#overview { flex:1; min-width:0; display:flex; gap:10px; overflow-x:auto; padding-bottom:4px; }
+.card { flex:0 0 178px; background:var(--card); border:1px solid var(--line); border-radius:6px; padding:8px 9px; cursor:pointer; }
+.card.sel { border-color:var(--accent); box-shadow:0 0 0 2px rgba(61,111,182,.18); }
+.card h3 { margin:0 0 4px; font-size:13px; display:flex; align-items:center; gap:6px; }
+.card h3 .num { color:var(--mute); font-weight:500; min-width:26px; }
+.card h3 .dot { width:7px; height:7px; border-radius:50%; background:#e08a2c; display:none; }
+.card.dirty h3 .dot { display:inline-block; }
+.card canvas { display:block; margin:4px auto 6px; }
+.card .meta { color:var(--mute); font-size:12px; }
+.card .meta b { color:var(--ink); font-weight:600; }
+.card .note { margin-top:4px; font-size:12px; color:#555; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.card .bad { color:var(--err); font-size:12px; }
+.chip { display:inline-block; width:10px; height:10px; border-radius:2px; vertical-align:-1px; margin-right:3px; border:1px solid rgba(0,0,0,.12); }
+details#curve { flex:none; }
+details#curve summary { cursor:pointer; color:var(--mute); }
+#curve table { border-collapse:collapse; margin-top:6px; background:#fff; border:1px solid var(--line); }
+#curve th, #curve td { padding:3px 8px; border-bottom:1px solid #eee; text-align:left; font-weight:normal; white-space:nowrap; }
+#curve th { color:var(--mute); }
+#curve tr.sel td { background:#eef3fb; }
+#curve tr[data-i] { cursor:pointer; }
+.bar { display:inline-block; height:8px; background:#9db3d6; vertical-align:middle; margin-right:5px; border-radius:1px; }
+button.on kbd { background:rgba(255,255,255,.2); border-color:rgba(255,255,255,.35); color:#fff; }
+button { white-space:nowrap; }
+main { display:grid; grid-template-columns:auto minmax(320px, 1fr); gap:18px; padding:12px 14px 30px; align-items:start; }
+.toolbar { display:flex; flex-wrap:wrap; gap:4px; align-items:center; margin-bottom:8px; }
+.toolbar .label { color:var(--mute); margin-right:2px; }
+#boardWrap { background:#fff; border:1px solid var(--line); border-radius:6px; padding:10px; display:inline-block; }
+#board { display:block; cursor:crosshair; }
+#playbar { margin-top:8px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; min-height:28px; }
+#playbar input[type=range] { width:260px; }
+#help { color:var(--mute); font-size:12px; margin-top:8px; max-width:640px; }
+.panel { background:#fff; border:1px solid var(--line); border-radius:6px; padding:10px 12px; margin-bottom:12px; }
+.panel h4 { margin:0 0 8px; font-size:13px; }
+.form { display:grid; grid-template-columns:64px 1fr; gap:6px 8px; align-items:center; }
+.form input, .form select, .form textarea, #xsb { font:inherit; padding:3px 6px; border:1px solid var(--line); border-radius:4px; width:100%; background:#fff; }
+.form textarea { min-height:64px; resize:vertical; }
+#xsb { font:14px/1.25 "SF Mono", Menlo, Consolas, monospace; min-height:180px; resize:vertical; white-space:pre; }
+.msgs div { margin:1px 0; }
+.msgs .e { color:var(--err); }
+.msgs .w { color:var(--warn); }
+.msgs .o { color:var(--ok); }
+.stats { display:grid; grid-template-columns:repeat(4, auto); gap:2px 14px; justify-content:start; margin:6px 0; }
+.stats span { color:var(--mute); }
+#trapBars { display:flex; align-items:flex-end; gap:2px; height:56px; margin:6px 0 2px; }
+#trapBars div { width:9px; background:#c9d4e6; position:relative; cursor:pointer; display:flex; flex-direction:column-reverse; }
+#trapBars div i { display:block; width:100%; }
+#trapBars div.cur { outline:2px solid var(--accent); }
+.legend { font-size:12px; color:var(--mute); }
+.legend i { display:inline-block; width:9px; height:9px; margin:0 3px 0 8px; vertical-align:-1px; }
+kbd { font:11px Menlo, monospace; background:#eee; border:1px solid #ddd; border-radius:3px; padding:0 4px; }
+</style>
+</head>
+<body>
+<header>
+  <b>关卡工作台</b>
+  <button id="btnNew" title="在末尾新建一关">新建</button>
+  <button id="btnDup" title="复制当前关到末尾">复制</button>
+  <button id="btnDel">删除</button>
+  <span class="sep"></span>
+  <button id="btnLeft" title="与前一关交换顺序">◀ 前移</button>
+  <button id="btnRight" title="与后一关交换顺序">后移 ▶</button>
+  <span class="grow"></span>
+  <span id="status"></span>
+  <button id="btnSaveAll">全部保存</button>
+  <button id="btnSave" class="primary">保存 ⌘S</button>
+  <button id="btnGodot" title="保存并在游戏中直接打开这一关">在 Godot 中试玩</button>
+</header>
+
+<div id="top">
+  <section id="overview"></section>
+  <details id="curve" open>
+    <summary>曲线对比 <button id="btnTrapsAll" style="margin-left:8px">分析全部陷阱</button></summary>
+    <table id="curveTable"></table>
+  </details>
+</div>
+
+<main>
+  <div>
+    <div class="toolbar">
+      <button data-mode="edit">编辑 <kbd>E</kbd></button>
+      <button data-mode="play">试玩 <kbd>T</kbd></button>
+      <button data-mode="replay">回放最优解 <kbd>V</kbd></button>
+    </div>
+    <div class="toolbar" id="tools">
+      <span class="label">画笔</span>
+      <button data-tool="wall">墙 <kbd>1</kbd></button>
+      <button data-tool="floor">地板 <kbd>2</kbd></button>
+      <button data-tool="target">目标 <kbd>3</kbd></button>
+      <button data-tool="box">箱子 <kbd>4</kbd></button>
+      <button data-tool="player">玩家 <kbd>5</kbd></button>
+      <button data-tool="void">擦除 <kbd>6</kbd></button>
+      <span class="sep"></span>
+      <button id="btnWalls" title="给所有地板的外圈补上墙">自动围墙</button>
+      <button id="btnUndo">撤销</button>
+      <button id="btnRedo">重做</button>
+      <label style="margin-left:6px;color:var(--mute)"><input type="checkbox" id="chkDead" checked> 显示死格</label>
+    </div>
+    <div id="boardWrap"><canvas id="board"></canvas></div>
+    <div id="playbar"></div>
+    <div id="help"></div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <h4 id="title"></h4>
+      <div class="form">
+        <label>名称</label><input id="fName">
+        <label>英文名</label><input id="fNameEn">
+        <label>主题</label><select id="fTheme"></select>
+        <label>种子</label><div style="display:flex;gap:6px"><input id="fSeed" type="number"><button id="btnSeed" title="换一种程序化装饰（树、水、楼梯）">随机</button></div>
+        <label>设计意图</label><textarea id="fNote" placeholder="这一关想让玩家学会/体会什么？（存为关卡 JSON 的 note 字段，游戏不读取）"></textarea>
+      </div>
+    </div>
+    <div class="panel">
+      <h4>校验与求解</h4>
+      <div class="msgs" id="msgs"></div>
+      <div class="stats" id="stats"></div>
+      <div id="trapBox"></div>
+    </div>
+    <div class="panel">
+      <h4>地图文本（XSB：<code>#</code>墙 <code>-</code>地板 <code>.</code>目标 <code>$</code>箱子 <code>*</code>箱子在目标 <code>@</code>玩家 <code>+</code>玩家在目标，空格为虚空）</h4>
+      <textarea id="xsb" spellcheck="false"></textarea>
+    </div>
+  </div>
+</main>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const VOID = 0, FLOOR = 1, WALL = 2;
+const DIRS = [[0, -1], [0, 1], [-1, 0], [1, 0]];          // u d l r，与求解器一致
+const LETTER = { u: 0, d: 1, l: 2, r: 3 };
+const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII",
+               "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"];
+const THEME_SKY = { dawn: ["#9fd6e6", "#f6e7e3"], garden: ["#b9e8e3", "#fff1dc"], dusk: ["#f4a9a0", "#fde3c4"],
+                    lavender: ["#c3cff6", "#f6dbeb"], night: ["#10133a", "#3d2f7c"] };
+const THEME_ZH = { dawn: "晨曦", garden: "花园", dusk: "黄昏", lavender: "紫藤", night: "星夜" };
+const MIN_W = 16, MIN_H = 12, PAD = 2, CELL = 34;
+const HARDEST_EXPANDED = 13450;   // 现有最难关卡（第 4 关）的搜索状态数，游戏内求解器已验证够快
+const COLORS = { floor: "#ece3d3", floorLine: "#ddd2bf", wall: "#5d6677", wallTop: "#77819a", target: "#d9774b",
+                 box: "#b98552", boxEdge: "#8a5f37", boxDone: "#5f9e6e", boxDoneEdge: "#3f7a4f", player: "#3d6fb6",
+                 dead: "rgba(192,57,43,.35)", grid: "#eeeae3" };
+
+// ---------------------------------------------------------------------------
+// 网格模型（与 LevelData 一致：VOID/FLOOR/WALL + 目标层 + 箱子 + 玩家）
+// ---------------------------------------------------------------------------
+class Grid {
+  constructor(w, h) {
+    this.w = w; this.h = h;
+    this.cells = new Uint8Array(w * h);
+    this.target = new Uint8Array(w * h);
+    this.box = new Uint8Array(w * h);
+    this.player = -1;
+  }
+  clone() {
+    const g = new Grid(this.w, this.h);
+    g.cells.set(this.cells); g.target.set(this.target); g.box.set(this.box); g.player = this.player;
+    return g;
+  }
+  inb(x, y) { return x >= 0 && y >= 0 && x < this.w && y < this.h; }
+  bbox() {
+    let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
+    for (let y = 0; y < this.h; y++) for (let x = 0; x < this.w; x++) {
+      if (this.cells[y * this.w + x] !== VOID) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    }
+    return x1 < 0 ? null : { x0, y0, x1, y1 };
+  }
+}
+
+// 解析地图行，规则同 LevelData.from_rows：空格若能被玩家泛洪到达则为地板，否则为虚空。
+function parseRows(rows) {
+  let lines = rows.filter(r => !r.startsWith(";")).map(r => r.replace(/\t/g, "    ").replace(/[ \r]+$/, ""));
+  while (lines.length && lines[0].trim() === "") lines.shift();
+  while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
+  const h = lines.length, w = Math.max(0, ...lines.map(l => l.length));
+  const g = new Grid(w, h);
+  const unknown = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x, ch = x < lines[y].length ? lines[y][x] : " ";
+    if (ch === "#") g.cells[i] = WALL;
+    else if ("-_.$*@+".includes(ch)) {
+      g.cells[i] = FLOOR;
+      if (".*+".includes(ch)) g.target[i] = 1;
+      if ("$*".includes(ch)) g.box[i] = 1;
+      if ("@+".includes(ch)) g.player = i;
+    } else if (ch === " ") unknown[i] = 1;
+  }
+  if (g.player >= 0) {
+    const seen = new Uint8Array(w * h), stack = [g.player];
+    seen[g.player] = 1;
+    while (stack.length) {
+      const p = stack.pop(), px = p % w, py = (p - px) / w;
+      if (unknown[p]) g.cells[p] = FLOOR;
+      for (const [dx, dy] of DIRS) {
+        const qx = px + dx, qy = py + dy;
+        if (!g.inb(qx, qy)) continue;
+        const q = qy * w + qx;
+        if (seen[q] || g.cells[q] === WALL || (g.cells[q] === VOID && !unknown[q])) continue;
+        seen[q] = 1; stack.push(q);
+      }
+    }
+  }
+  return g;
+}
+
+// 输出地图行（本项目存档格式：地板写 '-'，虚空写空格，去掉行尾空格，裁掉四周虚空）。
+function toRows(g) {
+  const bb = g.bbox();
+  if (!bb) return [];
+  const rows = [];
+  for (let y = bb.y0; y <= bb.y1; y++) {
+    let line = "";
+    for (let x = bb.x0; x <= bb.x1; x++) {
+      const i = y * g.w + x, c = g.cells[i], t = g.target[i];
+      let ch = " ";
+      if (c === WALL) ch = "#";
+      else if (c === FLOOR) ch = i === g.player ? (t ? "+" : "@") : g.box[i] ? (t ? "*" : "$") : (t ? "." : "-");
+      line += ch;
+    }
+    rows.push(line.replace(/ +$/, ""));
+  }
+  return rows;
+}
+
+// 把内容居中放进留有边距的工作区。
+function placeInArea(src) {
+  const bb = src.bbox();
+  if (!bb) return new Grid(MIN_W, MIN_H);
+  const cw = bb.x1 - bb.x0 + 1, ch = bb.y1 - bb.y0 + 1;
+  const g = new Grid(Math.max(MIN_W, cw + 2 * PAD), Math.max(MIN_H, ch + 2 * PAD));
+  return shifted(src, g, Math.floor((g.w - cw) / 2) - bb.x0, Math.floor((g.h - ch) / 2) - bb.y0);
+}
+
+function shifted(src, g, ox, oy) {
+  for (let y = 0; y < src.h; y++) for (let x = 0; x < src.w; x++) {
+    if (!g.inb(x + ox, y + oy)) continue;
+    const i = y * src.w + x, j = (y + oy) * g.w + x + ox;
+    g.cells[j] = src.cells[i]; g.target[j] = src.target[i]; g.box[j] = src.box[i];
+    if (src.player === i) g.player = j;
+  }
+  return g;
+}
+
+// 内容贴近工作区边缘时向外扩展（只扩不缩，避免画到一半画布跳动）。
+function ensureMargin(g) {
+  const bb = g.bbox();
+  if (!bb) return g;
+  const l = Math.max(0, PAD - bb.x0), t = Math.max(0, PAD - bb.y0);
+  const r = Math.max(0, PAD - (g.w - 1 - bb.x1)), b = Math.max(0, PAD - (g.h - 1 - bb.y1));
+  if (!(l || t || r || b)) return g;
+  return shifted(g, new Grid(g.w + l + r, g.h + t + b), l, t);
+}
+
+function applyTool(g, tool, i, on) {
+  const clear = () => { g.target[i] = 0; g.box[i] = 0; if (g.player === i) g.player = -1; };
+  switch (tool) {
+    case "wall": g.cells[i] = WALL; clear(); break;
+    case "void": g.cells[i] = VOID; clear(); break;
+    case "floor": g.cells[i] = FLOOR; break;
+    case "target": g.cells[i] = FLOOR; g.target[i] = on ? 1 : 0; break;
+    case "box": g.cells[i] = FLOOR; g.box[i] = on ? 1 : 0; if (on && g.player === i) g.player = -1; break;
+    case "player": g.cells[i] = FLOOR; g.box[i] = 0; g.player = i; break;
+  }
+}
+
+// 地板外圈（8 邻域）的虚空补成墙。
+function autoWalls(g) {
+  g = ensureMargin(g);
+  const add = [];
+  for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) {
+    if (g.cells[y * g.w + x] !== VOID) continue;
+    let near = false;
+    for (let dy = -1; dy <= 1 && !near; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (g.inb(x + dx, y + dy) && g.cells[(y + dy) * g.w + x + dx] === FLOOR) { near = true; break; }
+    }
+    if (near) add.push(y * g.w + x);
+  }
+  for (const i of add) g.cells[i] = WALL;
+  return g;
+}
+
+// 在网格上推演一串 LURD（试玩/回放共用）。
+function startState(g) {
+  const boxes = new Set();
+  g.box.forEach((b, i) => { if (b) boxes.add(i); });
+  return { boxes, player: g.player, moves: 0, pushes: 0 };
+}
+function stepState(g, s, dir) {
+  const [dx, dy] = DIRS[dir], px = s.player % g.w, py = (s.player - px) / g.w;
+  if (!g.inb(px + dx, py + dy)) return null;
+  const n = s.player + dx + dy * g.w;
+  if (g.cells[n] !== FLOOR) return null;
+  const next = { boxes: s.boxes, player: n, moves: s.moves + 1, pushes: s.pushes, pushed: false };
+  if (s.boxes.has(n)) {
+    if (!g.inb(px + 2 * dx, py + 2 * dy)) return null;
+    const b = n + dx + dy * g.w;
+    if (g.cells[b] !== FLOOR || s.boxes.has(b)) return null;
+    next.boxes = new Set(s.boxes); next.boxes.delete(n); next.boxes.add(b);
+    next.pushes++; next.pushed = true;
+  }
+  return next;
+}
+function isSolved(g, s) { for (const b of s.boxes) if (!g.target[b]) return false; return s.boxes.size > 0; }
+function simulate(g, moves, k) {
+  let s = startState(g);
+  for (let i = 0; i < k && i < moves.length; i++) s = stepState(g, s, LETTER[moves[i].toLowerCase()]) || s;
+  return s;
+}
+
+// ---------------------------------------------------------------------------
+// 状态
+// ---------------------------------------------------------------------------
+let THEMES = [], levels = [], cur = 0, godotOk = false;
+let mode = "edit", tool = "wall", stroke = null;
+let play = null;                              // { state, hist }
+const rep = { k: 0, timer: null };
+let busy = false;                             // 分析队列（一次只跑一个求解进程）
+const analysisCache = new Map();              // akey -> 分析结果（撤销/改回原样时无需重新求解）
+const trapCache = new Map();                  // mapKey -> 陷阱分析
+
+function makeLevel(id, data) {
+  data.id = id;
+  return { id, data, saved: JSON.stringify(data), grid: placeInArea(parseRows(data.map || [])),
+           undo: [], redo: [], analysis: null, akey: "" };
+}
+const L = () => levels[cur];
+const isDirty = lv => JSON.stringify(lv.data) !== lv.saved;
+const mapKey = lv => JSON.stringify(lv.data.map);
+const akeyOf = lv => mapKey(lv) + "|" + lv.data.name;
+const trapsOf = lv => trapCache.get(mapKey(lv)) || null;
+const solutionOf = lv => (lv.analysis && lv.akey === akeyOf(lv) && lv.analysis.solution) ? lv.analysis.solution.moves : "";
+const numeral = lv => ROMAN[parseInt(lv.id, 10)] || lv.id;
+
+async function api(path, body) {
+  const res = await fetch(path, body === undefined ? {} :
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const j = await res.json();
+  if (!res.ok || j.error) throw new Error(j.error || res.statusText);
+  return j;
+}
+
+function setStatus(text, bad = false) { const s = $("#status"); s.textContent = text; s.className = bad ? "bad" : ""; s.title = text; }
+
+// ---------------------------------------------------------------------------
+// 分析（校验 + 求解），按“当前关优先”逐个排队
+// ---------------------------------------------------------------------------
+let pumpTimer = null;
+function schedule(delay = 250) { clearTimeout(pumpTimer); pumpTimer = setTimeout(pump, delay); }
+async function pump() {
+  if (busy) return;
+  const lv = [L(), ...levels].find(l => l && l.akey !== akeyOf(l));
+  if (!lv) return;
+  busy = true;
+  const key = akeyOf(lv);
+  let res = analysisCache.get(key);
+  if (!res) {
+    try { res = await api("/api/analyze", { map: lv.data.map, name: lv.data.name }); analysisCache.set(key, res); }
+    catch (e) { res = { errors: ["服务未响应：" + e.message], warnings: [] }; }
+  }
+  if (akeyOf(lv) === key) { lv.analysis = res; lv.akey = key; }
+  busy = false;
+  renderOverview(); renderCurve(); if (lv === L()) { renderPanel(); renderBoard(); renderPlaybar(); }
+  pump();
+}
+function waitAnalysis(lv) {
+  return new Promise(resolve => {
+    const check = () => { if (lv.akey === akeyOf(lv)) resolve(); else { pump(); setTimeout(check, 80); } };
+    check();
+  });
+}
+async function analyzeTraps(lv) {
+  const key = mapKey(lv);
+  setStatus(`分析陷阱：${numeral(lv)} ${lv.data.name}…`);
+  try {
+    const res = await api("/api/analyze", { map: lv.data.map, traps: true });
+    if (res.traps) trapCache.set(key, res.traps);
+    setStatus(res.traps ? "陷阱分析完成" : "无法分析：" + res.errors.join("；"), !res.traps);
+  } catch (e) { setStatus("陷阱分析失败：" + e.message, true); }
+  renderAll();
+}
+
+// ---------------------------------------------------------------------------
+// 绘制
+// ---------------------------------------------------------------------------
+function drawGrid(canvas, g, cell, opts = {}) {
+  const bb = opts.crop ? g.bbox() : null;
+  const x0 = bb ? bb.x0 : 0, y0 = bb ? bb.y0 : 0;
+  const w = bb ? bb.x1 - bb.x0 + 1 : g.w, h = bb ? bb.y1 - bb.y0 + 1 : g.h;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, w * cell * dpr); canvas.height = Math.max(1, h * cell * dpr);
+  canvas.style.width = w * cell + "px"; canvas.style.height = h * cell + "px";
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w * cell, h * cell);
+  const st = opts.state || startState(g);
+  const small = cell < 16;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y + y0) * g.w + x + x0, c = g.cells[i], px = x * cell, py = y * cell;
+    if (c === VOID) {
+      if (!small) { ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 1; ctx.strokeRect(px + .5, py + .5, cell - 1, cell - 1); }
+      continue;
+    }
+    if (c === WALL) {
+      ctx.fillStyle = COLORS.wall; ctx.fillRect(px, py, cell, cell);
+      if (!small) { ctx.fillStyle = COLORS.wallTop; ctx.fillRect(px, py, cell, cell * .18); }
+      continue;
+    }
+    ctx.fillStyle = COLORS.floor; ctx.fillRect(px, py, cell, cell);
+    if (!small) { ctx.strokeStyle = COLORS.floorLine; ctx.strokeRect(px + .5, py + .5, cell - 1, cell - 1); }
+    if (g.target[i]) {
+      ctx.strokeStyle = COLORS.target; ctx.lineWidth = Math.max(1.2, cell * .07);
+      const m = cell * .26; ctx.strokeRect(px + m, py + m, cell - 2 * m, cell - 2 * m); ctx.lineWidth = 1;
+    }
+  }
+  if (opts.dead) {
+    ctx.strokeStyle = COLORS.dead; ctx.lineWidth = 2;
+    for (const [x, y] of opts.dead) {
+      const px = (x + opts.origin.x0 - x0) * cell, py = (y + opts.origin.y0 - y0) * cell, m = cell * .36;
+      ctx.beginPath(); ctx.moveTo(px + m, py + m); ctx.lineTo(px + cell - m, py + cell - m);
+      ctx.moveTo(px + cell - m, py + m); ctx.lineTo(px + m, py + cell - m); ctx.stroke();
+    }
+    ctx.lineWidth = 1;
+  }
+  for (const b of st.boxes) {
+    const bx = b % g.w - x0, by = Math.floor(b / g.w) - y0, m = cell * .12, done = g.target[b];
+    ctx.fillStyle = done ? COLORS.boxDone : COLORS.box; ctx.fillRect(bx * cell + m, by * cell + m, cell - 2 * m, cell - 2 * m);
+    if (!small) { ctx.strokeStyle = done ? COLORS.boxDoneEdge : COLORS.boxEdge; ctx.lineWidth = 2; ctx.strokeRect(bx * cell + m + 1, by * cell + m + 1, cell - 2 * m - 2, cell - 2 * m - 2); ctx.lineWidth = 1; }
+  }
+  if (st.player >= 0) {
+    const ppx = (st.player % g.w - x0 + .5) * cell, ppy = (Math.floor(st.player / g.w) - y0 + .5) * cell;
+    ctx.fillStyle = COLORS.player; ctx.beginPath(); ctx.arc(ppx, ppy, cell * .3, 0, Math.PI * 2); ctx.fill();
+    if (!small) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke(); ctx.lineWidth = 1; }
+  }
+  for (const a of opts.arrows || []) {
+    const ax = (a.x - x0 + .5) * cell, ay = (a.y - y0 + .5) * cell, [dx, dy] = DIRS[a.d];
+    const len = cell * .55, ex = ax + dx * len, ey = ay + dy * len;
+    ctx.strokeStyle = a.color; ctx.fillStyle = a.color; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ex + dx * 7, ey + dy * 7); ctx.lineTo(ex - dy * 6, ey + dx * 6); ctx.lineTo(ex + dy * 6, ey - dx * 6); ctx.fill();
+    ctx.lineWidth = 1;
+  }
+}
+
+function renderBoard() {
+  const lv = L(), g = lv.grid, canvas = $("#board");
+  const opts = {};
+  const a = lv.analysis && lv.akey === akeyOf(lv) ? lv.analysis : null;
+  const origin = g.bbox();
+  if (mode === "edit" && $("#chkDead").checked && a && a.layout && origin) { opts.dead = a.layout.dead; opts.origin = origin; }
+  if (mode === "play" && play) opts.state = play.state;
+  if (mode === "replay") {
+    const moves = solutionOf(lv);
+    opts.state = simulate(g, moves, rep.k);
+    opts.arrows = replayArrows(lv, moves, origin);
+  }
+  canvas.style.cursor = mode === "edit" ? "crosshair" : "default";
+  drawGrid(canvas, g, CELL, opts);
+}
+
+// 回放时：绿色箭头 = 最优解的下一次推动；红/橙箭头 = 此刻可做的致命推法（需先分析陷阱）。
+function replayArrows(lv, moves, origin) {
+  const arrows = [];
+  if (!moves || !origin) return arrows;
+  let pushIndex = 0;
+  for (let i = 0; i < rep.k && i < moves.length; i++) if (moves[i] !== moves[i].toLowerCase()) pushIndex++;
+  const next = [...moves].findIndex((ch, i) => i >= rep.k && ch !== ch.toLowerCase());
+  if (next < 0) return arrows;
+  const g = lv.grid, s = simulate(g, moves, next), d = LETTER[moves[next].toLowerCase()];
+  const box = s.player + DIRS[d][0] + DIRS[d][1] * g.w;
+  arrows.push({ x: box % g.w, y: Math.floor(box / g.w), d, color: "rgba(47,125,85,.9)" });
+  const tr = trapsOf(lv);
+  if (tr && tr.steps[pushIndex]) {
+    for (const [x, y, dd, hidden] of tr.steps[pushIndex].bad)
+      arrows.push({ x: x + origin.x0, y: y + origin.y0, d: dd, color: hidden ? "rgba(192,57,43,.9)" : "rgba(231,160,74,.9)" });
+  }
+  return arrows;
+}
+
+function cardStats(lv) {
+  const a = lv.analysis && lv.akey === akeyOf(lv) ? lv.analysis : null;
+  if (!a) return '<div class="meta">分析中…</div>';
+  const lay = a.layout;
+  let html = lay ? `<div class="meta"><b>${lay.boxes}</b> 箱 · <b>${lay.floor}</b> 地板 · ${lay.width}×${lay.height}</div>` : "";
+  if (a.solution) html += `<div class="meta">最优 <b>${a.solution.par_moves}</b> 步 / <b>${a.solution.par_pushes}</b> 推 · 搜索 ${a.solution.expanded}</div>`;
+  const tr = trapsOf(lv);
+  if (tr) html += `<div class="meta">陷阱 隐蔽 <b>${tr.hidden}</b> · 明显 ${tr.simple} / ${tr.legal}</div>`;
+  if (a.errors.length) html += `<div class="bad">✗ ${a.errors[0]}</div>`;
+  return html;
+}
+
+function renderOverview() {
+  const box = $("#overview");
+  box.innerHTML = "";
+  levels.forEach((lv, i) => {
+    const card = document.createElement("div");
+    card.className = "card" + (i === cur ? " sel" : "") + (isDirty(lv) ? " dirty" : "");
+    card.dataset.i = i;
+    const sky = THEME_SKY[lv.data.theme] || ["#ccc", "#eee"];
+    card.innerHTML = `<h3><span class="num">${numeral(lv)}</span>${esc(lv.data.name)}<span class="dot" title="未保存"></span></h3>
+      <div class="meta"><span class="chip" style="background:linear-gradient(${sky[0]},${sky[1]})"></span>${THEME_ZH[lv.data.theme] || lv.data.theme} · levels/${lv.id}.json</div>`;
+    const c = document.createElement("canvas");
+    const bb = lv.grid.bbox();
+    const cell = bb ? Math.max(6, Math.min(14, Math.floor(156 / Math.max(bb.x1 - bb.x0 + 1, bb.y1 - bb.y0 + 1)))) : 10;
+    drawGrid(c, lv.grid, cell, { crop: true });
+    card.appendChild(c);
+    card.insertAdjacentHTML("beforeend", cardStats(lv) + (lv.data.note ? `<div class="note" title="${esc(lv.data.note)}">${esc(lv.data.note)}</div>` : ""));
+    box.appendChild(card);
+  });
+}
+
+function renderCurve() {
+  const cols = [
+    ["箱", lv => lay(lv)?.boxes],
+    ["地板", lv => lay(lv)?.floor],
+    ["步数", lv => sol(lv)?.par_moves],
+    ["推动", lv => sol(lv)?.par_pushes],
+    ["搜索状态", lv => sol(lv)?.expanded, v => Math.log10(v + 1)],
+    ["隐蔽陷阱", lv => trapsOf(lv)?.hidden],
+    ["明显陷阱", lv => trapsOf(lv)?.simple],
+    ["可选推法", lv => trapsOf(lv)?.legal],
+  ];
+  const vals = cols.map(([, get]) => levels.map(get));
+  const maxes = cols.map(([, , scale], c) => Math.max(1e-9, ...vals[c].filter(v => v !== undefined).map(v => scale ? scale(v) : v)));
+  let html = "<tr><th>关卡</th>" + cols.map(([label]) => `<th>${label}</th>`).join("") + "</tr>";
+  levels.forEach((lv, i) => {
+    html += `<tr data-i="${i}" class="${i === cur ? "sel" : ""}"><td>${numeral(lv)} ${esc(lv.data.name)}</td>` + cols.map(([, , scale], c) => {
+      const v = vals[c][i];
+      if (v === undefined) return "<td>—</td>";
+      const w = Math.round(((scale ? scale(v) : v) / maxes[c]) * 40);
+      return `<td><span class="bar" style="width:${w}px"></span>${v}</td>`;
+    }).join("") + "</tr>";
+  });
+  $("#curveTable").innerHTML = html;
+}
+const lay = lv => (lv.analysis && lv.akey === akeyOf(lv)) ? lv.analysis.layout : undefined;
+const sol = lv => (lv.analysis && lv.akey === akeyOf(lv)) ? lv.analysis.solution : undefined;
+
+function renderPanel() {
+  const lv = L(), d = lv.data;
+  $("#title").textContent = `${numeral(lv)} · levels/${lv.id}.json` + (isDirty(lv) ? "（未保存）" : "");
+  const a = lv.analysis && lv.akey === akeyOf(lv) ? lv.analysis : null;
+  let msgs = "";
+  if (!a) msgs = '<div>分析中…</div>';
+  else {
+    msgs += a.errors.map(e => `<div class="e">✗ ${esc(e)}</div>`).join("");
+    msgs += a.warnings.map(w => `<div class="w">! ${esc(w)}</div>`).join("");
+    if (a.solution && a.solution.expanded > HARDEST_EXPANDED * 2)
+      msgs += `<div class="w">! 搜索状态 ${a.solution.expanded}，远超现有最难关卡（${HARDEST_EXPANDED}），游戏内的提示求解和单元测试可能明显变慢</div>`;
+    if (a.solution && !a.errors.length) msgs += `<div class="o">✓ 可解${isDirty(lv) ? "（保存时会写入新的参考步数与最优解）" : ""}</div>`;
+  }
+  $("#msgs").innerHTML = msgs;
+  let stats = "";
+  if (a && a.layout) stats += `<span>尺寸</span>${a.layout.width}×${a.layout.height}<span>地板</span>${a.layout.floor}<span>箱子</span>${a.layout.boxes}<span>死格</span>${a.layout.dead.length}`;
+  if (a && a.solution) stats += `<span>最优步数</span>${a.solution.par_moves}<span>最优推动</span>${a.solution.par_pushes}<span>搜索状态</span>${a.solution.expanded}<span>求解</span>${a.solution.seconds}s`;
+  $("#stats").innerHTML = stats;
+
+  const tr = trapsOf(lv);
+  let tb = `<button id="btnTraps" ${a && a.solution ? "" : "disabled"}>分析陷阱</button> <span class="legend">沿最优解的每一次推动，统计此刻所有可做的推法里有多少会让关卡无解</span>`;
+  if (tr) {
+    const pct = v => tr.legal ? Math.round(v / tr.legal * 100) + "%" : "—";
+    tb += `<div style="margin-top:6px">可选推法 <b>${tr.legal}</b> · 隐蔽陷阱 <b style="color:var(--hidden)">${tr.hidden}</b>（${pct(tr.hidden)}）· 明显陷阱 <b style="color:var(--simple)">${tr.simple}</b>（${pct(tr.simple)}）${tr.unknown ? ` · 未判定 ${tr.unknown}` : ""}</div>`;
+    const maxLegal = Math.max(1, ...tr.steps.map(s => s.legal));
+    tb += '<div id="trapBars">' + tr.steps.map((s, i) => {
+      const h = v => Math.round(v / maxLegal * 54);
+      return `<div data-step="${i}" title="第 ${i + 1} 次推动前：可选 ${s.legal}，隐蔽 ${s.hidden}，明显 ${s.simple}" style="height:${h(s.legal)}px"><i style="height:${h(s.hidden)}px;background:var(--hidden)"></i><i style="height:${h(s.simple)}px;background:var(--simple)"></i></div>`;
+    }).join("") + "</div>";
+    tb += '<div class="legend">每根柱 = 最优解中一次推动前的局面（点击跳到回放）<i style="background:var(--hidden)"></i>隐蔽：看似可行但已无解<i style="background:var(--simple)"></i>明显：推进死格</div>';
+  }
+  $("#trapBox").innerHTML = tb;
+  const bt = $("#btnTraps"); if (bt) bt.onclick = () => analyzeTraps(lv);
+  if (tr && mode === "replay") {
+    const moves = solutionOf(lv);
+    let p = 0; for (let i = 0; i < rep.k && i < moves.length; i++) if (moves[i] !== moves[i].toLowerCase()) p++;
+    const el = document.querySelector(`#trapBars div[data-step="${p}"]`); if (el) el.classList.add("cur");
+  }
+}
+
+// 控制条只在模式/关卡/解变化时重建，其余时候只更新数值，保证拖动进度条和自动播放时点“暂停”不受重绘影响。
+let playbarKey = "";
+function renderPlaybar() {
+  const bar = $("#playbar"), lv = L(), moves = mode === "replay" ? solutionOf(lv) : "";
+  const key = `${mode}|${cur}|${moves}`;
+  if (key !== playbarKey) {
+    playbarKey = key;
+    if (mode === "edit") bar.innerHTML = "";
+    else if (mode === "play") bar.innerHTML = '<span id="pInfo"></span><button data-act="pUndo">撤销 Z</button><button data-act="pReset">重开 R</button><span id="pWin"></span>';
+    else if (!moves) bar.innerHTML = '<span style="color:var(--mute)">没有可回放的解（关卡不可解或仍在分析）</span>';
+    else {
+      bar.innerHTML = `<button data-act="rFirst">⏮</button><button data-act="rPrev">◀</button><button data-act="rPlay" id="rPlay"></button><button data-act="rNext">▶</button><button data-act="rLast">⏭</button>
+        <input type="range" id="rSlider" min="0" max="${moves.length}"><span id="rInfo"></span>`;
+      $("#rSlider").oninput = e => setRep(+e.target.value);
+    }
+  }
+  if (mode === "play") {
+    const s = play.state, par = sol(lv)?.par_moves;
+    $("#pInfo").innerHTML = `步数 <b>${s.moves}</b> · 推动 <b>${s.pushes}</b>${par ? ` · 最优 ${par}` : ""}`;
+    $("#pWin").innerHTML = isSolved(lv.grid, s)
+      ? `<b style="color:var(--ok)">✓ 完成！${par ? (s.moves === par ? "（最优）" : `（比最优多 ${s.moves - par} 步）`) : ""}</b>` : "";
+  } else if (mode === "replay" && moves) {
+    const s = simulate(lv.grid, moves, rep.k);
+    $("#rSlider").value = rep.k;
+    $("#rPlay").textContent = rep.timer ? "暂停" : "播放";
+    $("#rInfo").innerHTML = ` ${rep.k}/${moves.length} 步 · 推动 ${s.pushes} <code style="color:var(--mute)">${esc(moves.slice(Math.max(0, rep.k - 6), rep.k))}<b style="color:var(--ink)">${esc(moves.slice(rep.k, rep.k + 1))}</b>${esc(moves.slice(rep.k + 1, rep.k + 10))}</code>`;
+  }
+}
+$("#playbar").addEventListener("click", e => {
+  const b = e.target.closest("[data-act]");
+  if (!b) return;
+  const n = solutionOf(L()).length;
+  ({ pUndo: undoPlay, pReset: resetPlay, rFirst: () => setRep(0), rLast: () => setRep(n),
+     rPrev: () => setRep(rep.k - 1), rNext: () => setRep(rep.k + 1), rPlay: toggleRepPlay })[b.dataset.act]();
+});
+
+function renderHelp() {
+  const help = {
+    edit: "左键用画笔绘制（可拖动），右键擦除为虚空；目标/箱子画笔点一下切换。<kbd>1</kbd>–<kbd>6</kbd> 切换画笔，<kbd>⌘Z</kbd>/<kbd>⇧⌘Z</kbd> 撤销/重做。右侧地图文本与网格双向同步，可直接粘贴 XSB。",
+    play: "<kbd>WASD</kbd>/方向键移动，<kbd>Z</kbd> 撤销，<kbd>R</kbd> 重开。",
+    replay: "<kbd>←</kbd>/<kbd>→</kbd> 单步，<kbd>空格</kbd> 播放/暂停。绿色箭头是最优解的下一次推动；分析陷阱后，红色箭头为隐蔽陷阱、橙色为明显陷阱。",
+  }[mode];
+  $("#help").innerHTML = help + " 切换关卡 <kbd>[</kbd> <kbd>]</kbd>。";
+}
+
+function renderForm() {
+  const d = L().data;
+  $("#fName").value = d.name || ""; $("#fNameEn").value = d.name_en || "";
+  $("#fTheme").value = d.theme; $("#fSeed").value = d.seed ?? 0; $("#fNote").value = d.note || "";
+  syncText(true);
+}
+
+function renderAll() {
+  if (!levels.length) return;
+  renderOverview(); renderCurve(); renderPanel(); renderBoard(); renderPlaybar(); renderHelp();
+  document.querySelectorAll("[data-mode]").forEach(b => b.classList.toggle("on", b.dataset.mode === mode));
+  document.querySelectorAll("[data-tool]").forEach(b => b.classList.toggle("on", b.dataset.tool === tool));
+  $("#tools").style.visibility = mode === "edit" ? "visible" : "hidden";
+  $("#btnLeft").disabled = cur === 0; $("#btnRight").disabled = cur === levels.length - 1;
+  const dirtyCount = levels.filter(isDirty).length;
+  $("#btnSaveAll").disabled = dirtyCount === 0; $("#btnSaveAll").textContent = dirtyCount > 1 ? `全部保存（${dirtyCount}）` : "全部保存";
+  $("#btnGodot").disabled = !godotOk;
+}
+
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+// ---------------------------------------------------------------------------
+// 编辑
+// ---------------------------------------------------------------------------
+function commit(lv) {
+  lv.data.map = toRows(lv.grid);
+  syncText();
+  schedule();
+  renderAll();
+}
+function syncText(force = false) {
+  if (force || document.activeElement !== $("#xsb")) $("#xsb").value = L().data.map.join("\n");
+}
+function pushUndo(lv) { lv.undo.push(lv.grid.clone()); if (lv.undo.length > 300) lv.undo.shift(); lv.redo = []; }
+function undoEdit() { const lv = L(); if (!lv.undo.length) return; lv.redo.push(lv.grid); lv.grid = lv.undo.pop(); commit(lv); }
+function redoEdit() { const lv = L(); if (!lv.redo.length) return; lv.undo.push(lv.grid); lv.grid = lv.redo.pop(); commit(lv); }
+
+function cellAt(e) {
+  const g = L().grid, r = $("#board").getBoundingClientRect();
+  const x = Math.floor((e.clientX - r.left) / CELL), y = Math.floor((e.clientY - r.top) / CELL);
+  return g.inb(x, y) ? y * g.w + x : -1;
+}
+function paint(i) {
+  if (i < 0 || i === stroke.last) return;
+  stroke.last = i;
+  applyTool(L().grid, stroke.tool, i, stroke.on);
+  renderBoard();
+}
+
+const board = $("#board");
+board.addEventListener("contextmenu", e => e.preventDefault());
+board.addEventListener("mousedown", e => {
+  if (mode !== "edit") return;
+  const i = cellAt(e); if (i < 0) return;
+  e.preventDefault();
+  const lv = L(), g = lv.grid;
+  const t = e.button === 2 ? "void" : tool;
+  stroke = { tool: t, on: t === "target" ? !g.target[i] : t === "box" ? !g.box[i] : true, before: g.clone(), rows: JSON.stringify(toRows(g)), last: -1 };
+  paint(i);
+});
+window.addEventListener("mousemove", e => { if (stroke) paint(cellAt(e)); });
+window.addEventListener("mouseup", () => {
+  if (!stroke) return;
+  const lv = L(), s = stroke; stroke = null;
+  if (JSON.stringify(toRows(lv.grid)) === s.rows) return;
+  lv.undo.push(s.before); if (lv.undo.length > 300) lv.undo.shift(); lv.redo = [];
+  lv.grid = ensureMargin(lv.grid);
+  commit(lv);
+});
+
+let textTimer = null;
+$("#xsb").addEventListener("input", () => { clearTimeout(textTimer); textTimer = setTimeout(applyText, 300); });
+$("#xsb").addEventListener("blur", () => { clearTimeout(textTimer); applyText(); syncText(true); });
+function applyText() {
+  const lv = L(), rows = $("#xsb").value.split("\n");
+  const g = placeInArea(parseRows(rows));
+  if (JSON.stringify(toRows(g)) === JSON.stringify(lv.data.map)) return;
+  pushUndo(lv);
+  lv.grid = g;
+  commit(lv);
+}
+
+$("#btnWalls").onclick = () => { const lv = L(); pushUndo(lv); lv.grid = autoWalls(lv.grid); commit(lv); };
+$("#btnUndo").onclick = undoEdit;
+$("#btnRedo").onclick = redoEdit;
+$("#chkDead").onchange = renderBoard;
+// 这些区域会随分析结果频繁重绘，用 pointerdown 委托，避免按下与抬起落在新旧两个元素上导致点击丢失
+$("#overview").addEventListener("pointerdown", e => { const c = e.target.closest(".card"); if (c) select(+c.dataset.i); });
+$("#curveTable").addEventListener("pointerdown", e => { const r = e.target.closest("tr[data-i]"); if (r) select(+r.dataset.i); });
+$("#trapBox").addEventListener("pointerdown", e => { const b = e.target.closest("[data-step]"); if (b) jumpToPush(+b.dataset.step); });
+document.querySelectorAll("[data-tool]").forEach(b => b.onclick = () => { tool = b.dataset.tool; renderAll(); });
+document.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => setMode(b.dataset.mode));
+
+function bindField(sel, apply) { $(sel).addEventListener("input", e => { apply(L().data, e.target.value); onMetaChanged(); }); }
+bindField("#fName", (d, v) => d.name = v);
+bindField("#fNameEn", (d, v) => d.name_en = v);
+bindField("#fSeed", (d, v) => d.seed = parseInt(v, 10) || 0);
+bindField("#fNote", (d, v) => { if (v.trim()) d.note = v; else delete d.note; });
+$("#fTheme").addEventListener("change", e => { L().data.theme = e.target.value; onMetaChanged(); });
+$("#btnSeed").onclick = () => { L().data.seed = 1000 + Math.floor(Math.random() * 9000); $("#fSeed").value = L().data.seed; onMetaChanged(); };
+function onMetaChanged() { schedule(400); renderAll(); }
+
+// ---------------------------------------------------------------------------
+// 试玩 / 回放
+// ---------------------------------------------------------------------------
+function setMode(m) {
+  mode = m;
+  stopRep();
+  if (m === "play") resetPlay();
+  if (m === "replay") rep.k = 0;
+  renderAll();
+}
+function resetPlay() { play = { state: startState(L().grid), hist: [] }; renderBoard(); renderPlaybar(); }
+function undoPlay() { if (play.hist.length) play.state = play.hist.pop(); renderBoard(); renderPlaybar(); }
+function movePlay(dir) {
+  const next = stepState(L().grid, play.state, dir);
+  if (!next) return;
+  play.hist.push(play.state); play.state = next;
+  renderBoard(); renderPlaybar();
+}
+function setRep(k) {
+  const n = solutionOf(L()).length;
+  rep.k = Math.max(0, Math.min(n, k));
+  if (rep.k >= n) stopRep();
+  renderBoard(); renderPlaybar(); renderPanel();
+}
+function stopRep() { if (rep.timer) { clearInterval(rep.timer); rep.timer = null; } }
+function toggleRepPlay() {
+  if (rep.timer) stopRep();
+  else {
+    if (rep.k >= solutionOf(L()).length) rep.k = 0;
+    rep.timer = setInterval(() => setRep(rep.k + 1), 160);
+  }
+  renderPlaybar();
+}
+function jumpToPush(p) {
+  const moves = solutionOf(L());
+  let seen = 0, k = 0;
+  for (; k < moves.length; k++) { if (moves[k] !== moves[k].toLowerCase()) { if (seen === p) break; seen++; } }
+  if (mode !== "replay") setMode("replay");
+  setRep(k);
+}
+
+// ---------------------------------------------------------------------------
+// 关卡选择、保存与文件操作
+// ---------------------------------------------------------------------------
+function select(i) {
+  cur = Math.max(0, Math.min(levels.length - 1, i));
+  stopRep();
+  if (mode === "play") play = { state: startState(L().grid), hist: [] };
+  rep.k = 0;
+  renderForm(); renderAll(); schedule(0);
+}
+
+async function saveLevel(lv) {
+  setStatus("保存中…");
+  await waitAnalysis(lv);
+  const a = lv.analysis, d = lv.data;
+  if (a.solution) { d.par_moves = a.solution.par_moves; d.par_pushes = a.solution.par_pushes; d.solution = a.solution.moves; }
+  else { d.par_moves = -1; d.par_pushes = -1; d.solution = ""; }
+  await api("/api/save", { id: lv.id, data: d });
+  lv.saved = JSON.stringify(d);
+  if (a.solution) setStatus(`已保存 levels/${lv.id}.json`);
+  else setStatus(`已保存 levels/${lv.id}.json，但关卡目前不可解：${a.errors[0] || ""}（游戏单元测试会失败）`, true);
+  renderAll();
+}
+async function saveAll() { for (const lv of levels) if (isDirty(lv)) await saveLevel(lv); }
+function requireAllSaved() {
+  if (levels.some(isDirty)) { setStatus("有未保存的修改，请先保存（全部保存）", true); return false; }
+  return true;
+}
+async function reload(selectId) {
+  const j = await api("/api/levels");
+  THEMES = j.themes; godotOk = j.godot;
+  levels = j.levels.map(e => {
+    const lv = makeLevel(e.file, e.data);
+    return lv;
+  });
+  const idx = levels.findIndex(lv => lv.id === selectId);
+  select(idx >= 0 ? idx : 0);
+}
+
+$("#btnSave").onclick = () => saveLevel(L()).catch(e => setStatus("保存失败：" + e.message, true));
+$("#btnSaveAll").onclick = () => saveAll().catch(e => setStatus("保存失败：" + e.message, true));
+$("#btnGodot").onclick = async () => {
+  try {
+    if (isDirty(L())) await saveLevel(L());
+    await api("/api/play", { id: L().id });
+    setStatus(`正在 Godot 中打开 ${numeral(L())} ${L().data.name}…`);
+  } catch (e) { setStatus("启动失败：" + e.message, true); }
+};
+$("#btnNew").onclick = async () => {
+  try { const j = await api("/api/create", {}); levels.push(makeLevel(j.id, j.data)); select(levels.length - 1); setStatus(`已新建 levels/${j.id}.json`); }
+  catch (e) { setStatus("新建失败：" + e.message, true); }
+};
+$("#btnDup").onclick = async () => {
+  try {
+    if (isDirty(L())) await saveLevel(L());
+    const j = await api("/api/create", { from: L().id }); levels.push(makeLevel(j.id, j.data)); select(levels.length - 1);
+    setStatus(`已复制为 levels/${j.id}.json`);
+  } catch (e) { setStatus("复制失败：" + e.message, true); }
+};
+$("#btnDel").onclick = async () => {
+  const lv = L();
+  if (!requireAllSaved()) return;
+  if (!confirm(`删除 ${numeral(lv)} ${lv.data.name}（levels/${lv.id}.json）？\n后面的关卡会自动前移编号。文件可用 git 恢复。`)) return;
+  try { await api("/api/delete", { id: lv.id }); await reload(levels[Math.max(0, cur - 1)].id); setStatus("已删除"); }
+  catch (e) { setStatus("删除失败：" + e.message, true); }
+};
+async function swapWith(delta) {
+  const j = cur + delta;
+  if (j < 0 || j >= levels.length || !requireAllSaved()) return;
+  const a = levels[cur].id, b = levels[j].id;
+  try { await api("/api/swap", { a, b }); await reload(b); setStatus(`已交换 ${a} ↔ ${b}`); }
+  catch (e) { setStatus("交换失败：" + e.message, true); }
+}
+$("#btnLeft").onclick = () => swapWith(-1);
+$("#btnRight").onclick = () => swapWith(1);
+$("#btnTrapsAll").onclick = async e => {
+  e.preventDefault();
+  for (const lv of levels) { await waitAnalysis(lv); if (lv.analysis.solution && !trapsOf(lv)) await analyzeTraps(lv); }
+};
+
+// 点完按钮/滑块/复选框后交还焦点，空格和方向键始终归快捷键使用
+document.addEventListener("click", e => { const c = e.target.closest("button, input[type=range], input[type=checkbox]"); if (c) c.blur(); });
+$("#playbar").addEventListener("change", e => e.target.blur());
+window.addEventListener("beforeunload", e => { if (levels.some(isDirty)) { e.preventDefault(); e.returnValue = ""; } });
+
+document.addEventListener("keydown", e => {
+  const el = document.activeElement;
+  const typing = /^(TEXTAREA|SELECT)$/.test(el.tagName) || (el.tagName === "INPUT" && /^(text|number|search)$/.test(el.type));
+  const mod = e.metaKey || e.ctrlKey, k = e.key.toLowerCase();
+  if (mod && k === "s") { e.preventDefault(); $("#btnSave").click(); return; }
+  if (typing) return;
+  if (mod && k === "z" && mode === "edit") { e.preventDefault(); e.shiftKey ? redoEdit() : undoEdit(); return; }
+  if (mod && k === "y" && mode === "edit") { e.preventDefault(); redoEdit(); return; }
+  if (mod || e.altKey) return;
+  if (k === "e") return setMode("edit");
+  if (k === "t") return setMode("play");
+  if (k === "v") return setMode("replay");
+  if (k === "[") return select(cur - 1);
+  if (k === "]") return select(cur + 1);
+  if (mode === "edit") {
+    const t = ["wall", "floor", "target", "box", "player", "void"][+k - 1];
+    if (t) { tool = t; renderAll(); }
+  } else if (mode === "play") {
+    const dir = { arrowup: 0, w: 0, arrowdown: 1, s: 1, arrowleft: 2, a: 2, arrowright: 3, d: 3 }[k];
+    if (dir !== undefined) { e.preventDefault(); movePlay(dir); }
+    else if (k === "z" || k === "backspace") undoPlay();
+    else if (k === "r") resetPlay();
+  } else {
+    if (k === "arrowleft") { e.preventDefault(); setRep(rep.k - 1); }
+    else if (k === "arrowright") { e.preventDefault(); setRep(rep.k + 1); }
+    else if (k === " ") { e.preventDefault(); toggleRepPlay(); }
+    else if (k === "home") setRep(0);
+    else if (k === "end") setRep(1e9);
+  }
+});
+
+(async function init() {
+  try {
+    const j = await api("/api/levels");
+    THEMES = j.themes; godotOk = j.godot;
+    $("#fTheme").innerHTML = THEMES.map(t => `<option value="${t}">${THEME_ZH[t] || t}（${t}）</option>`).join("");
+    levels = j.levels.map(e => makeLevel(e.file, e.data));
+    if (!levels.length) { setStatus("levels/ 下没有关卡，点“新建”开始", true); return; }
+    select(0);
+    setStatus(`已载入 ${levels.length} 关`);
+  } catch (e) { setStatus("无法连接服务：" + e.message, true); }
+})();
+</script>
+</body>
+</html>

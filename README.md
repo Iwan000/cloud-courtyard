@@ -186,6 +186,7 @@ godot --headless --path . --fixed-fps 60 -- --smoke
 
 | 脚本 | 用途 |
 |---|---|
+| `tools/level_studio.py` | 开发用的网页关卡工作台（`python3 tools/level_studio.py`，打开 http://127.0.0.1:8765）：总览全部关卡与难度曲线，网格/XSB 双向编辑，浏览器内试玩与最优解回放，陷阱分析，保存时自动写入 par 值，可一键在 Godot 中打开该关 |
 | `tools/solver.py` | 离线求解与关卡验证，`--write` 把 par 值和最优解写回关卡 JSON |
 | `tools/gen_audio.py` | 用 numpy 合成全部音效与音乐，可复现 |
 | `tools/subset_fonts.py` | 扫描代码与关卡中用到的字符，把思源黑体子集化，并导出 400/500/600/700 四个静态字重（17 MB → 4 × 约 300 KB） |
@@ -193,7 +194,8 @@ godot --headless --path . --fixed-fps 60 -- --smoke
 ## 扩展指南
 
 - **新增关卡**：
-  - 在 `levels/` 放入新的 JSON，按文件名排序后会自动出现在选关界面
+  - 推荐用 `tools/level_studio.py` 新建和调整，保存时会自动校验并写入 par 值
+  - 也可以在 `levels/` 直接放入新的 JSON，按文件名排序后会自动出现在选关界面
   - 也可以在关卡编辑器中制作，再把 `user://levels/` 里的文件复制过来
   - 最后用 `tools/solver.py --write` 补全 par 值
 - **新增主题**：
