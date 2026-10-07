@@ -1,0 +1,9 @@
+# Normalize line endings to LF on every platform (Godot's default), so a
+# Windows checkout produces the same files as macOS / Linux.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ogg binary
+*.wav binary
+*.ttf binary

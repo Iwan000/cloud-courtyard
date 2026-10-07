@@ -23,6 +23,8 @@
 2. 用 Godot 打开本目录下的 `project.godot`，首次打开会自动导入资源。
 3. 按 **F5** 运行。
 
+Windows、macOS、Linux 均可直接打开运行：工程只用 GDScript，没有平台相关代码，文件名全部是 ASCII，换行符由 `.gitattributes` 统一为 LF。默认使用 Forward+ 渲染器；显卡不支持时 Godot 会自动回退到兼容渲染器，画面基本一致（两种渲染器都已实测）。
+
 工程不依赖任何插件或外部库。所有美术资源都是程序生成的，音效由 `tools/gen_audio.py` 合成，字体为 OFL 授权的子集。
 
 ## 操作
