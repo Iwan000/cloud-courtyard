@@ -1,6 +1,6 @@
 # 云上庭 · 推箱解谜
 
-> 一款推箱解谜游戏（cloud-courtyard）
+> 作者：郭城（Iwan）
 > Godot 4.6 · 纪念碑谷风格 · 含完整关卡流程与关卡编辑器
 
 ![标题](docs/images/title.jpg)
