@@ -20,6 +20,13 @@ func build() -> void:
 	UiKit.pin(box, 0.0, 0.47, 132, 0)
 	var title := UiKit.label("云上庭", 100, 700)
 	box.add_child(title)
+	# 副标题点明玩法：名字只描述了画风
+	var subtitle := UiKit.label("推箱解谜", 30, 500, Color(UiKit.ink, 0.6))
+	var spaced := FontVariation.new()
+	spaced.base_font = UiKit.font(500)
+	spaced.spacing_glyph = 10
+	subtitle.add_theme_font_override("font", spaced)
+	box.add_child(subtitle)
 	var gap := Control.new()
 	gap.custom_minimum_size.y = 22
 	box.add_child(gap)
@@ -52,6 +59,7 @@ func build() -> void:
 		if _first_button == null:
 			_first_button = b
 	UiKit.appear(title, 0.05)
+	UiKit.appear(subtitle, 0.15)
 
 	var credit := UiKit.label("郭城（Iwan）", 15, 400, Color(UiKit.ink, 0.35))
 	add_child(credit)
