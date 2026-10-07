@@ -25,6 +25,8 @@ var target_nodes := {}   # Vector2i -> MeshInstance3D
 
 ## 速度倍率（回放最优解时加速）
 var speed := 1.0
+## 静音：标题画面的演示循环不发出脚步、推箱与入位音效
+var quiet := false
 
 var _anim := {}
 var _target_glow := {}   # Vector2i -> 当前发光值
@@ -43,6 +45,8 @@ func setup(st: SokobanState, material_lib: ThemePalette.MaterialLib, theme_dict:
 	state = st
 	mats = material_lib
 	theme = theme_dict
+	speed = 1.0
+	quiet = false
 	for c in get_children():
 		c.queue_free()
 	box_nodes.clear()
@@ -131,7 +135,7 @@ func play(r: SokobanState.MoveResult) -> void:
 	_anim = {"kind": kind, "t": 0.0, "dur": dur / speed, "r": r, "fx_done": false}
 	if r.dir >= 0:
 		_target_yaw = Character.yaw_for_dir(SokobanState.DIRS[r.dir])
-	match kind:
+	match "" if quiet else kind:
 		"walk":
 			Sfx.play("step", randf_range(0.9, 1.15))
 		"push":
@@ -194,8 +198,9 @@ func _advance(delta: float) -> void:
 				# 顶着箱子一起前进
 				if not _anim["fx_done"]:
 					_anim["fx_done"] = true
-					Sfx.play("push", randf_range(0.92, 1.05))
-					Sfx.play_push_note()
+					if not quiet:
+						Sfx.play("push", randf_range(0.92, 1.05))
+						Sfx.play_push_note()
 					fx.dust(box_from + dir3 * 0.45, dir3, Color(theme["fog"]).lerp(Color(theme["floor"][1]), 0.5))
 				var k := _ease_push((t - PUSH_LEAN_END) / (PUSH_MOVE_END - PUSH_LEAN_END))
 				character.lean = 1.0
@@ -244,8 +249,9 @@ func _finish(r: SokobanState.MoveResult, kind: String) -> void:
 			var at := cell_pos(r.box_to)
 			fx.light_pillar(at, t_glow)
 			fx.sparkles(at + Vector3(0, 0.2, 0), t_glow)
-			Sfx.play("target_on")
-		elif r.box_left_target:
+			if not quiet:
+				Sfx.play("target_on")
+		elif r.box_left_target and not quiet:
 			Sfx.play("target_off", 1.0, -4.0)
 	step_finished.emit(r)
 

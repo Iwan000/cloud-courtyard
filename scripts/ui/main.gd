@@ -26,6 +26,12 @@ var _transitioning := false
 var _preview_pending: LevelData
 var _previewing := false
 var _hint_waiting := false
+var _demo: TitleDemo     ## 标题画面的演示循环（离开标题时释放）
+
+## 标题画面的演示：一条走廊，小兵把石箱一格一格推到印记上，然后循环。
+## 不属于关卡列表，只用来让人一眼看出这是推箱子游戏。
+const TITLE_DEMO_MAP := ["########", "#@$---.#", "########"]
+const TITLE_DEMO_SEED := 2024
 
 
 func _ready() -> void:
@@ -118,6 +124,9 @@ func _set_ui_theme(theme: Dictionary) -> void:
 
 
 func _clear_screen() -> void:
+	if _demo and is_instance_valid(_demo):
+		_demo.queue_free()
+	_demo = null
 	for n in [screen_node, hud]:
 		if n and is_instance_valid(n):
 			n.queue_free()
@@ -148,7 +157,7 @@ func go_title() -> void:
 	if Game.builtin.is_empty():
 		return
 	var lvl: LevelData = Game.builtin[Game.next_level_index()]
-	await _show_scenery(lvl, Vector2(0.2, 0.0))
+	await _show_title_demo(lvl.theme)
 	var t := TitleScreen.new()
 	ui_root.add_child(t)
 	t.build()
@@ -159,6 +168,66 @@ func go_title() -> void:
 	t.quit_pressed.connect(func(): Game.quit_game())
 	screen_node = t
 	t.focus_first()
+
+
+func _show_title_demo(theme_id: String) -> void:
+	var demo := LevelData.from_rows(PackedStringArray(TITLE_DEMO_MAP))
+	demo.theme = theme_id
+	demo.decor_seed = TITLE_DEMO_SEED
+	if world.monument:
+		await director.play_outro(board.visible)
+	world.set_top_down(false, false)
+	world.load_level(demo, true, Vector2(0.2, 0.0), 1.35)
+	_set_ui_theme(world.theme)
+	var st := SokobanState.new(demo)
+	board.setup(st, world.mats, world.theme)
+	board.visible = false
+	_demo = TitleDemo.new()
+	_demo.board = board
+	_demo.state = st
+	add_child(_demo)
+	_start_title_demo(_demo)
+
+
+func _start_title_demo(demo: TitleDemo) -> void:
+	await director.play_intro(true)
+	if is_instance_valid(demo) and demo == _demo:
+		board.quiet = true
+		board.speed = 0.5
+		demo.running = true
+
+
+## 标题演示：小兵一步一步把石箱推到印记上，停留片刻后复位，循环。
+## 逐帧推进而不用协程等待：退出游戏时不会留下挂起的协程。
+class TitleDemo:
+	extends Node
+	var board: BoardView
+	var state: SokobanState
+	var running := false
+	var _phase := "wait"
+	var _timer := 1.0
+
+	func _process(delta: float) -> void:
+		if not running or board.is_busy():
+			return
+		_timer -= delta
+		if _timer > 0.0:
+			return
+		match _phase:
+			"wait":
+				_phase = "push"
+			"push":
+				if state.is_solved():
+					_phase = "hold"
+					_timer = 2.8
+				else:
+					board.play(state.move(SokobanState.Dir.RIGHT))
+					_timer = 0.55
+			"hold":
+				state.reset()
+				board.play_reset()
+				_phase = "wait"
+				_timer = 1.6
 
 
 # ---------------------------------------------------------------------------
